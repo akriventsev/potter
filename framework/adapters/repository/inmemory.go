@@ -9,13 +9,15 @@ import (
 
 // InMemoryConfig конфигурация для InMemory репозитория
 type InMemoryConfig struct {
-	BufferSize int
+	// MaxEntities максимальное количество сущностей (0 = без ограничений)
+	// При достижении лимита Save вернет ошибку
+	MaxEntities int
 }
 
 // DefaultInMemoryConfig возвращает конфигурацию InMemory по умолчанию
 func DefaultInMemoryConfig() InMemoryConfig {
 	return InMemoryConfig{
-		BufferSize: 1000,
+		MaxEntities: 0, // Без ограничений по умолчанию
 	}
 }
 
@@ -44,6 +46,16 @@ func (r *InMemoryRepository[T]) Save(ctx context.Context, entity T) error {
 	id := entity.ID()
 	if id == "" {
 		return fmt.Errorf("entity ID cannot be empty")
+	}
+
+	// Проверяем лимит, если он установлен
+	if r.config.MaxEntities > 0 {
+		// Если entity уже существует, не считаем его как новую запись
+		if _, exists := r.entities[id]; !exists {
+			if len(r.entities) >= r.config.MaxEntities {
+				return fmt.Errorf("repository limit reached: max %d entities", r.config.MaxEntities)
+			}
+		}
 	}
 
 	r.entities[id] = entity

@@ -7,7 +7,13 @@
 
 ## [1.2.0] - 2025-XX-XX
 
+> **Примечание**: Для планируемых, но ещё не реализованных фич см. [ROADMAP.md](ROADMAP.md).
+
 ### Added
+
+#### Warehouse Example
+
+- **Warehouse Example** теперь считается частью официальной демонстрационной витрины и обновляется при изменении ядра фреймворка. Пример синхронизирован с версиями фреймворка и демонстрирует best practices использования всех компонентов.
 
 #### Code Generator
 
@@ -41,20 +47,6 @@
 - Автоматическая генерация SQL миграций
 - Docker Compose для локальной разработки
 - Comprehensive документация и примеры
-
-### Dependencies
-
-- Added `github.com/dave/jennifer v1.7.0` для генерации Go кода
-
-### Documentation
-
-- Добавлена документация кодогенератора в `framework/codegen/README.md`
-- Обновлен главный README с секцией о Code Generator
-- Добавлен пример использования в `examples/codegen/README.md`
-
-## [1.2.0] - 2024-XX-XX
-
-### Added
 
 - **Invoke Module Enhancements**: Расширение модуля `framework/invoke/` с новыми возможностями
   - `SubjectResolver` интерфейс и реализации (`DefaultSubjectResolver`, `FunctionSubjectResolver`, `StaticSubjectResolver`) для гибкой настройки subjects команд и событий
@@ -194,106 +186,6 @@
 
 - Warehouse example теперь полностью функционален и может быть запущен через `make run`
 
-## [1.1.0] - 2024-01-XX (Unreleased)
-
-### Fixed
-
-- **Критическая ошибка импорта**: Удален неправильный импорт `examples/warehouse/domain` из `framework/adapters/repository/inmemory.go`
-- **Архитектурное нарушение**: Удален `DomainRepository` из `inmemory.go`, который нарушал принцип независимости фреймворка
-- **TODO комментарии**: Исправлены все TODO в `registry.go` (RegisteredAt), `factory.go` (CreateHandlerFromFunc), `fsm.go` (persistence ID), `kafka.go` (transactional transport)
-- **Отсутствие валидации**: Добавлена валидация конфигураций для всех адаптеров (PostgreSQL, MongoDB, NATS, Kafka, Redis)
-- **Graceful shutdown**: Добавлен graceful shutdown для `AsyncEventPublisher` с drain queue и ожиданием завершения воркеров
-
-### Removed
-
-- **Deprecated код**: Удалена директория `pkg/cqrs/` - все пользователи должны использовать `framework/cqrs` напрямую
-- **Артефакты сборки**: Удален бинарный файл `server` из корня проекта
-- **Неиспользуемый код**: Удален `DomainRepository` из `inmemory.go` (нарушал архитектуру фреймворка)
-
-### Added
-
-- **Unit тесты**: Добавлены comprehensive unit тесты для core компонентов:
-  - `framework/core/types_test.go` - тесты для FrameworkContext, Error, Result, Option
-  - `framework/transport/bus_test.go` - тесты для CommandBus и QueryBus
-  - `framework/events/publisher_test.go` - тесты для всех типов EventPublisher
-  - `framework/container/container_test.go` - тесты для DI контейнера
-  - `framework/adapters/repository/inmemory_test.go` - тесты для InMemoryRepository
-  - `framework/cqrs/registry_test.go` - тесты для CQRS Registry
-- **Валидация конфигураций**: Добавлены методы `Validate()` для всех адаптеров:
-  - `PostgresConfig.Validate()` - проверка DSN, TableName, MaxOpenConns, MaxIdleConns
-  - `MongoConfig.Validate()` - проверка URI, Database, Collection, MaxPoolSize
-  - `NATSConfig.Validate()` - проверка URL формата (nats:// или tls://)
-  - `KafkaConfig.Validate()` - проверка Brokers (не пустой, формат host:port)
-  - `RedisConfig.Validate()` - проверка Addr и StreamName, Ping при создании
-- **Улучшенная документация**: Обновлены примеры кода и README файлы
-- **Makefile команды**: Добавлены команды для тестирования (`test-coverage`, `test-unit`, `test-integration`) и очистки (`clean`)
-
-### Changed
-
-- **FSM persistence**: Добавлено поле `id` в структуру `FSM` с автоматической генерацией UUID для корректного сохранения состояния
-- **AsyncEventPublisher**: Добавлен graceful shutdown с `stopCh`, `WaitGroup` и drain queue логикой
-- **Warehouse example**: Рефакторинг 2PC handlers - создана helper функция `handleTwoPCRequest` для уменьшения дублирования кода (~90 строк до ~30)
-- **Примеры кода**: Переименованы функции примеров в lowercase для соответствия Go conventions
-- **.gitignore**: Добавлены игнорирования для всех артефактов сборки, IDE файлов и временных файлов
-
-### Added (продолжение)
-
-- **Built-in MessageBus адаптеры**: NATS, Kafka, Redis Streams, InMemory
-  - `framework/adapters/messagebus/nats.go` - улучшенный NATS адаптер с connection pooling, метриками, lifecycle
-  - `framework/adapters/messagebus/kafka.go` - Kafka адаптер с поддержкой request-reply, dead letter queue
-  - `framework/adapters/messagebus/redis.go` - Redis Streams адаптер для легковесных pub/sub сценариев
-  - `framework/adapters/messagebus/inmemory.go` - InMemory адаптер для тестирования с поддержкой wildcards
-  - `framework/adapters/messagebus/factory.go` - фабрика для создания MessageBus адаптеров
-
-- **Built-in Event Publisher адаптеры**: NATS, Kafka, MessageBus
-  - `framework/adapters/events/nats.go` - NATS Event Publisher с retry логикой и метриками
-  - `framework/adapters/events/kafka.go` - Kafka Event Publisher для event sourcing с гарантией порядка
-  - `framework/adapters/events/messagebus.go` - универсальный MessageBus Event Publisher с batch publishing
-  - `framework/adapters/events/factory.go` - фабрика для создания Event Publisher адаптеров
-
-- **Built-in Repository адаптеры**: InMemory, PostgreSQL, MongoDB
-  - `framework/adapters/repository/inmemory.go` - generic in-memory репозиторий с индексами и транзакциями
-  - `framework/adapters/repository/postgres.go` - generic PostgreSQL репозиторий с query builder
-  - `framework/adapters/repository/mongodb.go` - generic MongoDB репозиторий с поддержкой aggregation
-  - `framework/adapters/repository/factory.go` - фабрика для создания Repository адаптеров
-
-- **Built-in Transport адаптеры**: REST, gRPC, WebSocket
-  - `framework/adapters/transport/rest.go` - REST API адаптер с автоматической маршрутизацией команд/запросов
-  - `framework/adapters/transport/grpc.go` - gRPC адаптер с interceptors и health checks
-  - `framework/adapters/transport/websocket.go` - WebSocket адаптер для real-time коммуникации и event streaming
-  - `framework/adapters/transport/router.go` - generic Command/Query router для transport адаптеров
-
-- **Документация и примеры**:
-  - `framework/adapters/README.md` - полная документация по всем адаптерам
-  - Примеры использования для каждого типа адаптера (в планах)
-
-### Changed
-
-- Перемещены адаптеры из `internal/adapters/` в `framework/adapters/` как built-in компоненты
-- Улучшена конфигурация адаптеров с использованием builder pattern
-- Добавлена поддержка lifecycle методов (Start, Stop, IsRunning) для всех адаптеров
-- Улучшена обработка ошибок с typed errors для различных сценариев
-- Добавлена интеграция с метриками OpenTelemetry для всех адаптеров
-- Реализован graceful shutdown для всех адаптеров
-
-### Deprecated
-
-- `internal/adapters/*` пакеты помечены как deprecated
-  - Используйте `framework/adapters/*` вместо этого
-  - Старые адаптеры будут удалены в версии 2.0.0
-
-### Migration Guide
-
-Для миграции на новые адаптеры:
-
-1. Обновите импорты с `internal/adapters/*` на `framework/adapters/*`
-2. Используйте фабрики для создания адаптеров:
-   ```go
-   factory := messagebus.NewMessageBusFactory()
-   bus, err := factory.Create("nats", config)
-   ```
-3. Обновите конфигурацию согласно новым структурам конфигурации
-4. Протестируйте изменения в staging окружении
 
 ## [1.0.0] - 2024-01-XX
 

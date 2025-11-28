@@ -28,6 +28,7 @@ type eventWaiter struct {
 	timeout       time.Duration
 	correlationID string
 	createdAt     time.Time
+	handler       events.EventHandler // Сохраняем handler для отписки
 }
 
 // NewEventAwaiter создает новый EventAwaiter
@@ -58,6 +59,11 @@ func NewEventAwaiterFromTransport(
 	resolver SubjectResolver,
 ) *EventAwaiter {
 	return NewEventAwaiter(NewTransportSubscriberAdapter(subscriber, serializer, resolver))
+}
+
+// NewEventAwaiterFromEventSource создает EventAwaiter из EventSource
+func NewEventAwaiterFromEventSource(eventSource EventSource) *EventAwaiter {
+	return NewEventAwaiter(eventSource)
 }
 
 // Await ожидает событие по correlation ID с timeout
@@ -94,24 +100,35 @@ func (a *EventAwaiter) Await(ctx context.Context, correlationID string, eventTyp
 		return nil, fmt.Errorf("failed to subscribe to event type %s: %w", eventType, err)
 	}
 
+	// Сохраняем handler в waiter для последующей отписки
+	waiter.handler = handler
+
 	// Ждем событие или timeout
 	select {
 	case event := <-waiter.ch:
+		// Отписываемся перед возвратом
+		_ = a.eventSource.Unsubscribe(eventType, handler)
 		a.mu.Lock()
 		delete(a.waiters, correlationID)
 		a.mu.Unlock()
 		return event, nil
 	case <-time.After(timeout):
+		// Отписываемся перед возвратом
+		_ = a.eventSource.Unsubscribe(eventType, handler)
 		a.mu.Lock()
 		delete(a.waiters, correlationID)
 		a.mu.Unlock()
 		return nil, NewEventTimeoutError(correlationID, timeout.String())
 	case <-ctx.Done():
+		// Отписываемся перед возвратом
+		_ = a.eventSource.Unsubscribe(eventType, handler)
 		a.mu.Lock()
 		delete(a.waiters, correlationID)
 		a.mu.Unlock()
 		return nil, ctx.Err()
 	case <-a.stopCh:
+		// Отписываемся перед возвратом
+		_ = a.eventSource.Unsubscribe(eventType, handler)
 		a.mu.Lock()
 		delete(a.waiters, correlationID)
 		a.mu.Unlock()

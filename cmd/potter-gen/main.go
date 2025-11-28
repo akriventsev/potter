@@ -20,6 +20,8 @@ func main() {
 		runGenerate()
 	case "update":
 		runUpdate()
+	case "check":
+		runCheck()
 	case "sdk":
 		runSDK()
 	case "version":
@@ -40,6 +42,7 @@ func printUsage() {
 	fmt.Println("  init       - Initialize a new project")
 	fmt.Println("  generate   - Generate code from proto")
 	fmt.Println("  update     - Update existing code")
+	fmt.Println("  check      - Compare generated code against proto spec, exit with non-zero status on discrepancies (for CI)")
 	fmt.Println("  sdk        - Generate SDK")
 	fmt.Println("  version    - Show version")
 	fmt.Println()

@@ -56,6 +56,52 @@ func NewCommandInvokerWithoutError[TCommand transport.Command, TSuccessEvent eve
 	}
 }
 
+// NewCommandInvokerWithOptions создает CommandInvoker с использованием InvokeOptions
+// Рекомендуется для сложных сценариев с кастомными настройками таймаутов, источников событий и типов событий
+func NewCommandInvokerWithOptions[TCommand transport.Command, TSuccessEvent events.Event, TErrorEvent ErrorEvent](
+	bus *AsyncCommandBus,
+	options ...InvokeOption,
+) (*CommandInvoker[TCommand, TSuccessEvent, TErrorEvent], error) {
+	opts := ApplyOptions(options...)
+
+	// Проверяем наличие EventSource
+	if opts.EventSource == nil {
+		return nil, NewEventSourceNotConfiguredError()
+	}
+
+	// Создаем EventAwaiter из EventSource
+	awaiter := NewEventAwaiterFromEventSource(opts.EventSource)
+
+	// Определяем типы событий
+	successEventType := opts.SuccessEventType
+	if successEventType == "" {
+		return nil, fmt.Errorf("success event type is required")
+	}
+
+	errorEventType := opts.ErrorEventType
+
+	invoker := &CommandInvoker[TCommand, TSuccessEvent, TErrorEvent]{
+		commandBus:       bus,
+		eventAwaiter:     awaiter,
+		successEventType: successEventType,
+		errorEventType:   errorEventType,
+		timeout:          opts.Timeout,
+		serializer:       DefaultSerializer(),
+	}
+
+	// Применяем SubjectResolver к bus, если указан
+	if opts.SubjectResolver != nil {
+		bus.WithSubjectResolver(opts.SubjectResolver)
+	}
+
+	// Устанавливаем таймаут, если указан
+	if opts.Timeout > 0 {
+		invoker.timeout = opts.Timeout
+	}
+
+	return invoker, nil
+}
+
 // WithTimeout устанавливает таймаут ожидания события
 func (i *CommandInvoker[TCommand, TSuccessEvent, TErrorEvent]) WithTimeout(timeout time.Duration) *CommandInvoker[TCommand, TSuccessEvent, TErrorEvent] {
 	i.timeout = timeout

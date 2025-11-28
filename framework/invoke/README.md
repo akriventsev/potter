@@ -29,6 +29,7 @@ EventAwaiter <- EventBus (consume event) <- Match correlation ID -> Client
 
 Generic invoker для команд с ожиданием событий по correlation ID.
 
+**Быстрый конструктор (для простых случаев):**
 ```go
 // Создание invoker с поддержкой ошибочных событий
 asyncBus := invoke.NewAsyncCommandBus(natsAdapter)
@@ -39,13 +40,36 @@ invoker := invoke.NewCommandInvoker[CreateProductCommand, ProductCreatedEvent, P
     "product.created",    // тип успешного события
     "product.creation_failed", // тип ошибочного события
 )
+```
+
+**Options-based конструктор (рекомендуется для сложных сценариев):**
+```go
+// Создание invoker с полной настройкой через опции
+asyncBus := invoke.NewAsyncCommandBus(natsAdapter)
+invoker, err := invoke.NewCommandInvokerWithOptions[
+    CreateProductCommand,
+    ProductCreatedEvent,
+    ProductCreationFailedEvent,
+](
+    asyncBus,
+    invoke.WithEventBus(eventBus),
+    invoke.WithSuccessEventType("product.created"),
+    invoke.WithErrorEventType("product.creation_failed"),
+    invoke.WithTimeout(60*time.Second),
+    invoke.WithSubjectResolver(customResolver),
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
 
 // Использование
 cmd := CreateProductCommand{Name: "Laptop", SKU: "LAP-001"}
 event, err := invoker.Invoke(ctx, cmd)
 if err != nil {
     // обработка ошибки (может быть из ErrorEvent)
-    if errorEventErr, ok := err.(*core.FrameworkError); ok && errorEventErr.Code == invoke.ErrErrorEventReceived {
+    var frameworkErr *core.FrameworkError
+    if errors.As(err, &frameworkErr) && frameworkErr.Code == invoke.ErrErrorEventReceived {
         // получено ошибочное событие
     }
 }
@@ -70,9 +94,23 @@ invokerWithoutError := invoke.NewCommandInvokerWithoutError[CreateProductCommand
 
 Generic type-safe обертка над QueryBus.
 
+**Быстрый конструктор (для простых случаев):**
 ```go
 // Создание invoker
 invoker := invoke.NewQueryInvoker[GetProductQuery, GetProductResponse](queryBus)
+```
+
+**Options-based конструктор (рекомендуется для сложных сценариев):**
+```go
+// Создание invoker с полной настройкой через опции
+invoker := invoke.NewQueryInvokerWithOptions[GetProductQuery, GetProductResponse](
+    queryBus,
+    invoke.WithTimeout(30*time.Second),
+    invoke.WithMetadata(map[string]interface{}{
+        "trace_id": traceID,
+    }),
+)
+```
 
 // Использование
 query := GetProductQuery{ID: "product-123"}
@@ -384,6 +422,82 @@ resolver := invoke.NewStaticSubjectResolver(
 )
 ```
 
+## Error Handling
+
+Модуль Invoke возвращает все ошибки как экземпляры `core.FrameworkError` с определенными кодами ошибок. Это обеспечивает единообразную обработку ошибок и возможность pattern-matching по кодам.
+
+### Коды ошибок
+
+Модуль определяет следующие коды ошибок в `framework/invoke/errors.go`:
+
+- `ErrEventTimeout` - таймаут ожидания события
+- `ErrInvalidResultType` - неверный тип результата запроса
+- `ErrCommandPublishFailed` - ошибка публикации команды
+- `ErrValidationFailed` - ошибка валидации
+- `ErrQueryTimeout` - таймаут выполнения запроса
+- `ErrCorrelationIDNotFound` - отсутствует correlation ID в контексте
+- `ErrEventAwaiterStopped` - EventAwaiter остановлен
+- `ErrInvalidSubjectResolver` - некорректный SubjectResolver
+- `ErrEventSourceNotConfigured` - источник событий не настроен
+- `ErrErrorEventReceived` - получено ошибочное событие
+
+### Обработка ошибок
+
+Все ошибки возвращаются как `*core.FrameworkError` с определенным кодом. Для проверки типа ошибки используйте pattern-matching по коду:
+
+```go
+import (
+    "errors"
+    "potter/framework/core"
+    "potter/framework/invoke"
+)
+
+// ...
+
+event, err := invoker.Invoke(ctx, cmd)
+if err != nil {
+    var frameworkErr *core.FrameworkError
+    if errors.As(err, &frameworkErr) {
+        switch frameworkErr.Code {
+        case invoke.ErrEventTimeout:
+            log.Printf("Event timeout: %v", frameworkErr)
+        case invoke.ErrErrorEventReceived:
+            log.Printf("Error event received: %v", frameworkErr)
+            // Можно извлечь детали из wrapped error
+            if cause := frameworkErr.Unwrap(); cause != nil {
+                log.Printf("Cause: %v", cause)
+            }
+        case invoke.ErrCommandPublishFailed:
+            log.Printf("Failed to publish command: %v", frameworkErr)
+        default:
+            log.Printf("Unknown error: %v", frameworkErr)
+        }
+    } else {
+        // Не FrameworkError - неожиданная ошибка
+        log.Printf("Unexpected error type: %v", err)
+    }
+}
+```
+
+**Примечание:** Используйте `errors.As()` из стандартной библиотеки `errors` для безопасного извлечения `FrameworkError` из цепочки ошибок. Это предпочтительнее прямого type assertion, так как работает с wrapped errors.
+
+### Вспомогательные конструкторы
+
+Для создания ошибок используйте конструкторы из `framework/invoke/errors.go`:
+
+```go
+// Создание ошибки таймаута
+err := invoke.NewEventTimeoutError(correlationID, "30s")
+
+// Создание ошибки с оберткой
+err := invoke.NewCommandPublishFailedError("create_product", originalErr)
+
+// Создание ошибки валидации
+err := invoke.NewValidationFailedError(validationErr)
+```
+
+Все конструкторы возвращают `*core.FrameworkError` с соответствующим кодом и сообщением.
+
 ## Error Events
 
 Модуль поддерживает обработку событий об ошибках через интерфейс `ErrorEvent`.
@@ -441,10 +555,12 @@ invoker := invoke.NewCommandInvoker[
 event, err := invoker.Invoke(ctx, cmd)
 if err != nil {
     // Проверяем, является ли это ошибочным событием
-    if frameworkErr, ok := err.(*core.FrameworkError); ok {
-        if frameworkErr.Code == invoke.ErrErrorEventReceived {
-            // Получено ошибочное событие
-            // Можно извлечь детали из wrapped error
+    var frameworkErr *core.FrameworkError
+    if errors.As(err, &frameworkErr) && frameworkErr.Code == invoke.ErrErrorEventReceived {
+        // Получено ошибочное событие
+        // Можно извлечь детали из wrapped error
+        if cause := frameworkErr.Unwrap(); cause != nil {
+            log.Printf("Error event cause: %v", cause)
         }
     }
 }

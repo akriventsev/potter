@@ -38,17 +38,30 @@ type InMemoryAdapter struct {
 	running     bool
 	requestChs  map[string]chan *transport.Message // correlation ID -> channel
 	requestMu   sync.RWMutex
+	// Очереди сообщений для воркеров
+	messageQueues map[string]chan *transport.Message // subject -> queue
+	workerWg      sync.WaitGroup
+	stopWorkers   chan struct{}
 }
 
 // NewInMemoryAdapter создает новый InMemory адаптер
 func NewInMemoryAdapter(config InMemoryConfig) *InMemoryAdapter {
+	if config.BufferSize <= 0 {
+		config.BufferSize = 1000
+	}
+	if config.WorkerCount <= 0 {
+		config.WorkerCount = 10
+	}
+
 	return &InMemoryAdapter{
-		config:      config,
-		subscribers: make(map[string][]transport.MessageHandler),
-		responders:  make(map[string]func(ctx context.Context, request *transport.Message) (*transport.Message, error)),
-		channels:    make(map[string]chan *transport.Message),
-		running:     false,
-		requestChs:  make(map[string]chan *transport.Message),
+		config:        config,
+		subscribers:   make(map[string][]transport.MessageHandler),
+		responders:    make(map[string]func(ctx context.Context, request *transport.Message) (*transport.Message, error)),
+		channels:      make(map[string]chan *transport.Message),
+		running:       false,
+		requestChs:    make(map[string]chan *transport.Message),
+		messageQueues: make(map[string]chan *transport.Message),
+		stopWorkers:   make(chan struct{}),
 	}
 }
 
@@ -61,25 +74,100 @@ func (i *InMemoryAdapter) Start(ctx context.Context) error {
 		return nil
 	}
 
+	// Запускаем воркеры для обработки сообщений
+	for j := 0; j < i.config.WorkerCount; j++ {
+		i.workerWg.Add(1)
+		go i.worker(j)
+	}
+
 	i.running = true
 	return nil
+}
+
+// worker обрабатывает сообщения из очередей
+func (i *InMemoryAdapter) worker(id int) {
+	defer i.workerWg.Done()
+
+	for {
+		select {
+		case <-i.stopWorkers:
+			return
+		default:
+			// Проверяем все очереди на наличие сообщений
+			i.mu.RLock()
+			queues := make([]chan *transport.Message, 0, len(i.messageQueues))
+			for _, queue := range i.messageQueues {
+				queues = append(queues, queue)
+			}
+			i.mu.RUnlock()
+
+			// Обрабатываем сообщения из очередей
+			for _, queue := range queues {
+				select {
+				case msg := <-queue:
+					if msg != nil {
+						i.processMessage(context.Background(), msg)
+					}
+				default:
+					// Нет сообщений в этой очереди
+				}
+			}
+
+			// Небольшая задержка для снижения CPU usage
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
+
+// processMessage обрабатывает одно сообщение
+func (i *InMemoryAdapter) processMessage(ctx context.Context, msg *transport.Message) {
+	i.mu.RLock()
+	handlers := i.subscribers[msg.Subject]
+	// Проверяем wildcard подписки
+	for subj, h := range i.subscribers {
+		if i.matchSubject(msg.Subject, subj) && subj != msg.Subject {
+			handlers = append(handlers, h...)
+		}
+	}
+	i.mu.RUnlock()
+
+	for _, handler := range handlers {
+		if i.config.EnableOrdering {
+			// Синхронная обработка для FIFO
+			_ = handler(ctx, msg)
+		} else {
+			// Асинхронная обработка
+			go func(h transport.MessageHandler) {
+				_ = h(ctx, msg)
+			}(handler)
+		}
+	}
 }
 
 // Stop останавливает адаптер (реализация core.Lifecycle)
 func (i *InMemoryAdapter) Stop(ctx context.Context) error {
 	i.mu.Lock()
-	defer i.mu.Unlock()
-
 	if !i.running {
+		i.mu.Unlock()
 		return nil
 	}
+	i.running = false
+	i.mu.Unlock()
+
+	// Останавливаем воркеры
+	close(i.stopWorkers)
+	i.workerWg.Wait()
 
 	// Закрываем все channels
+	i.mu.Lock()
 	for _, ch := range i.channels {
 		close(ch)
 	}
+	for _, queue := range i.messageQueues {
+		close(queue)
+	}
+	i.mu.Unlock()
 
-	i.running = false
 	return nil
 }
 
@@ -102,11 +190,45 @@ func (i *InMemoryAdapter) Type() core.ComponentType {
 
 // Publish публикует сообщение в subject
 func (i *InMemoryAdapter) Publish(ctx context.Context, subject string, data []byte, headers map[string]string) error {
+	msg := &transport.Message{
+		Subject: subject,
+		Data:    data,
+		Headers: headers,
+	}
+
+	// Если воркеры запущены, добавляем сообщение в очередь
+	if i.running && i.config.WorkerCount > 0 {
+		i.mu.Lock()
+		queue, exists := i.messageQueues[subject]
+		if !exists {
+			// Создаем очередь с буфером указанного размера
+			queue = make(chan *transport.Message, i.config.BufferSize)
+			i.messageQueues[subject] = queue
+		}
+		i.mu.Unlock()
+
+		// Пытаемся добавить в очередь (неблокирующе)
+		select {
+		case queue <- msg:
+			// Сообщение добавлено в очередь, воркеры обработают
+		default:
+			// Очередь переполнена - обрабатываем синхронно
+			return i.processMessageSync(ctx, msg)
+		}
+		return nil
+	}
+
+	// Если воркеры не запущены, обрабатываем синхронно
+	return i.processMessageSync(ctx, msg)
+}
+
+// processMessageSync обрабатывает сообщение синхронно (fallback)
+func (i *InMemoryAdapter) processMessageSync(ctx context.Context, msg *transport.Message) error {
 	i.mu.RLock()
-	handlers := i.subscribers[subject]
+	handlers := i.subscribers[msg.Subject]
 	// Проверяем wildcard подписки
 	for subj, h := range i.subscribers {
-		if i.matchSubject(subject, subj) && subj != subject {
+		if i.matchSubject(msg.Subject, subj) && subj != msg.Subject {
 			handlers = append(handlers, h...)
 		}
 	}
@@ -114,12 +236,6 @@ func (i *InMemoryAdapter) Publish(ctx context.Context, subject string, data []by
 
 	if len(handlers) == 0 {
 		return nil
-	}
-
-	msg := &transport.Message{
-		Subject: subject,
-		Data:    data,
-		Headers: headers,
 	}
 
 	// Fan-out для всех подписчиков

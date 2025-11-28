@@ -96,13 +96,28 @@ func NewEventSourceNotConfiguredError() *core.FrameworkError {
 // NewErrorEventReceivedError создает ошибку-обертку для полученного ошибочного события
 func NewErrorEventReceivedError(errorEvent ErrorEvent) *core.FrameworkError {
 	var cause error
-	if errorEvent != nil && errorEvent.Error() != nil {
-		cause = errorEvent.Error()
+	var errorMessage string
+	
+	if errorEvent == nil {
+		errorMessage = "unknown error event"
+	} else {
+		if errorEvent.Error() != nil {
+			cause = errorEvent.Error()
+		}
+		errorMessage = errorEvent.ErrorMessage()
 	}
+	
+	if cause == nil {
+		return core.NewError(
+			ErrErrorEventReceived,
+			"error event received: "+errorMessage,
+		)
+	}
+	
 	return core.Wrap(
 		cause,
 		ErrErrorEventReceived,
-		"error event received: "+errorEvent.ErrorMessage(),
+		"error event received: "+errorMessage,
 	)
 }
 

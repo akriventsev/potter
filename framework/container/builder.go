@@ -102,14 +102,68 @@ func (b *ContainerBuilder) IgnoreDependencyErrors(ignore bool) *ContainerBuilder
 
 // Validate валидирует конфигурацию перед сборкой
 func (b *ContainerBuilder) Validate() error {
+	// Создаем временный контейнер для проверки циклических зависимостей
+	container := NewContainer(b.config)
+	container.registry = b.registry
+
 	// Проверка циклических зависимостей
-	// Проверка наличия всех зависимостей
-	// Проверка конфигурации
+	if err := container.DetectCircularDependencies(); err != nil {
+		return fmt.Errorf("circular dependency detected: %w", err)
+	}
+
+	// Проверка наличия всех зависимостей модулей
+	modules := b.registry.GetAllModules()
+	availableModules := make(map[string]Module)
+	for name, module := range modules {
+		availableModules[name] = module
+	}
+
+	for name, module := range modules {
+		if err := b.registry.validateDependencies(module.Dependencies(), availableModules); err != nil {
+			return fmt.Errorf("module %s has invalid dependencies: %w", name, err)
+		}
+	}
+
+	// Проверка наличия всех зависимостей адаптеров
+	adapters := b.registry.GetAllAdapters()
+	for name, adapter := range adapters {
+		deps := adapter.Dependencies()
+		for _, dep := range deps {
+			// Проверяем, существует ли зависимость в модулях или адаптерах
+			if _, exists := availableModules[dep]; !exists {
+				if _, exists := adapters[dep]; !exists {
+					return fmt.Errorf("adapter %s depends on non-existent component: %s", name, dep)
+				}
+			}
+		}
+	}
+
+	// Проверка наличия всех зависимостей транспортов
+	transports := b.registry.GetAllTransports()
+	for name, transport := range transports {
+		deps := transport.Dependencies()
+		for _, dep := range deps {
+			// Проверяем, существует ли зависимость в модулях, адаптерах или транспортах
+			if _, exists := availableModules[dep]; !exists {
+				if _, exists := adapters[dep]; !exists {
+					if _, exists := transports[dep]; !exists {
+						return fmt.Errorf("transport %s depends on non-existent component: %s", name, dep)
+					}
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
 // Build создает и инициализирует контейнер
 func (b *ContainerBuilder) Build(ctx context.Context) (*Container, error) {
+	// Валидация конфигурации перед сборкой (fail-fast)
+	if err := b.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	container := NewContainer(b.config)
 	container.registry = b.registry
 

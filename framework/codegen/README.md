@@ -59,6 +59,23 @@ protoc --proto_path=api \
 potter-gen update --proto api/service.proto --output ./myapp --interactive
 ```
 
+### 3.1. Проверка синхронности (для CI)
+
+```bash
+# Проверка расхождений между proto и кодом без применения изменений
+potter-gen check --proto api/service.proto --output ./myapp
+
+# Команда завершится с ненулевым кодом (exit code 1), если есть расхождения
+# Рекомендуется запускать в CI перед merge для гарантии синхронности proto и кода
+```
+
+**Пример использования в CI (GitHub Actions):**
+```yaml
+- name: Check codegen sync
+  run: |
+    potter-gen check --proto api/service.proto --output ./myapp
+```
+
 ### 4. Генерация SDK
 
 ```bash

@@ -234,6 +234,64 @@ func runUpdate() {
 	fmt.Println("Update completed")
 }
 
+func runCheck() {
+	fs := flag.NewFlagSet("check", flag.ExitOnError)
+	protoPath := fs.String("proto", "", "Path to proto file")
+	outputDir := fs.String("output", ".", "Output directory")
+
+	fs.Parse(os.Args[2:])
+
+	if *protoPath == "" {
+		fmt.Fprintf(os.Stderr, "Error: --proto is required\n")
+		os.Exit(1)
+	}
+
+	// Парсинг proto файла для получения новой спецификации
+	newSpec, err := parseProtoFile(*protoPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing proto file: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Определение module path
+	modulePath := newSpec.ModuleName
+	if modulePath == "" {
+		fmt.Fprintf(os.Stderr, "Error: module_name is required in potter.service option\n")
+		os.Exit(1)
+	}
+
+	config := &codegen.GeneratorConfig{
+		ModulePath:      modulePath,
+		OutputDir:       *outputDir,
+		PackageName:     filepath.Base(modulePath),
+		Overwrite:       false,
+		PreserveUserCode: true,
+	}
+
+	// Создание CodeUpdater
+	updater := codegen.NewCodeUpdater(*outputDir)
+
+	// Проверка расхождений (без применения изменений)
+	changes, err := updater.UpdateGeneratedFiles(newSpec, config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error checking files: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(changes) == 0 {
+		fmt.Println("✓ No discrepancies found. Code is in sync with proto.")
+		os.Exit(0)
+	}
+
+	// Есть расхождения - выводим информацию и завершаем с ненулевым кодом
+	fmt.Fprintf(os.Stderr, "✗ Found %d file(s) with discrepancies:\n", len(changes))
+	for _, change := range changes {
+		fmt.Fprintf(os.Stderr, "  - %s\n", change.Path)
+	}
+	fmt.Fprintf(os.Stderr, "\nRun 'potter-gen update --proto %s --output %s' to apply changes.\n", *protoPath, *outputDir)
+	os.Exit(1)
+}
+
 func runSDK() {
 	fs := flag.NewFlagSet("sdk", flag.ExitOnError)
 	protoPath := fs.String("proto", "", "Path to proto file")

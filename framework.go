@@ -9,13 +9,20 @@
 //   - Метрики на основе OpenTelemetry
 //   - Конечный автомат для саг и оркестрации
 //
-// Пример использования:
+// Рекомендуемый способ инициализации через DI-контейнер:
 //
-//	fw := framework.New()
-//	if err := fw.Initialize(ctx); err != nil {
+//	builder := container.NewContainerBuilder(&container.Config{}).
+//	    WithModule(&CQRSModule{}).
+//	    WithAdapter(&RepositoryAdapter{}).
+//	    WithTransport(&RESTTransport{})
+//
+//	container, err := builder.Build(ctx)
+//	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	defer fw.Shutdown(ctx)
+//	defer container.Shutdown(ctx)
+//
+// См. framework/container для подробной документации.
 package framework
 
 import (
@@ -26,10 +33,11 @@ import (
 )
 
 // Version представляет версию фреймворка
+// ВАЖНО: Версия должна соответствовать файлу VERSION в корне проекта
 const (
-	Version = "1.0.0"
+	Version = "1.2.0"
 	Major   = 1
-	Minor   = 0
+	Minor   = 2
 	Patch   = 0
 )
 
@@ -67,12 +75,19 @@ type Framework interface {
 }
 
 // BaseFramework базовая реализация фреймворка
+//
+// Deprecated: BaseFramework дублирует ответственность DI-контейнера и не рекомендуется к использованию.
+// Используйте framework/container.Container и framework/container.ContainerBuilder для инициализации приложений.
+// BaseFramework будет удален в версии 2.0.0.
 type BaseFramework struct {
 	components map[string]core.Component
 	metadata   Metadata
 }
 
 // New создает новый экземпляр фреймворка
+//
+// Deprecated: Используйте framework/container.NewContainerBuilder() для создания и настройки приложений.
+// Этот метод будет удален в версии 2.0.0.
 func New() *BaseFramework {
 	return &BaseFramework{
 		components: make(map[string]core.Component),

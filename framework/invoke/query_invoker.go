@@ -25,6 +25,27 @@ func NewQueryInvoker[TQuery transport.Query, TResult any](bus transport.QueryBus
 	}
 }
 
+// NewQueryInvokerWithOptions создает QueryInvoker с использованием InvokeOptions
+// Рекомендуется для сложных сценариев с кастомными настройками таймаутов и метаданных
+func NewQueryInvokerWithOptions[TQuery transport.Query, TResult any](
+	bus transport.QueryBus,
+	options ...InvokeOption,
+) *QueryInvoker[TQuery, TResult] {
+	opts := ApplyOptions(options...)
+
+	invoker := &QueryInvoker[TQuery, TResult]{
+		queryBus: bus,
+		timeout:  opts.Timeout,
+	}
+
+	// Устанавливаем таймаут, если указан
+	if opts.Timeout > 0 {
+		invoker.timeout = opts.Timeout
+	}
+
+	return invoker
+}
+
 // WithCache устанавливает кэш для запросов
 func (i *QueryInvoker[TQuery, TResult]) WithCache(cache transport.QueryCache) *QueryInvoker[TQuery, TResult] {
 	i.cache = cache

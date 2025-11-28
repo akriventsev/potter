@@ -71,6 +71,9 @@ func (c *FrameworkContext) GetCausationID() string {
 }
 
 // Error структура для ошибок фреймворка с кодами, сообщениями и stack trace
+//
+// Deprecated: use FrameworkError instead. Этот тип будет удален в следующем major релизе.
+// Используйте core.FrameworkError из framework/core/errors.go для всех новых ошибок.
 type Error struct {
 	Code      string
 	Message   string

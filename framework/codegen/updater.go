@@ -522,22 +522,30 @@ func (u *CodeUpdater) parseFileFromContent(content, path string) (*ParsedFile, e
 	return parsed, nil
 }
 
-// GenerateDiff генерирует unified diff
+// GenerateDiff генерирует unified diff с номерами строк и контекстом
 func (u *CodeUpdater) GenerateDiff(oldContent, newContent string) string {
-	// Упрощенная реализация diff
-	// В реальной реализации можно использовать библиотеку для diff (например, github.com/sergi/go-diff)
 	oldLines := strings.Split(oldContent, "\n")
 	newLines := strings.Split(newContent, "\n")
 	
 	var diff strings.Builder
 	diff.WriteString("--- old\n+++ new\n")
 	
-	// Простое сравнение строк
+	// Константы для unified diff
+	const contextLines = 3 // количество контекстных строк вокруг изменений
+	
+	// Вычисляем различия с помощью простого алгоритма
+	// Группируем изменения в hunks с контекстом
+	var hunks []hunk
+	var currentHunk *hunk
+	
 	maxLen := len(oldLines)
 	if len(newLines) > maxLen {
 		maxLen = len(newLines)
 	}
-
+	
+	oldLineNum := 1
+	newLineNum := 1
+	
 	for i := 0; i < maxLen; i++ {
 		oldLine := ""
 		newLine := ""
@@ -547,20 +555,125 @@ func (u *CodeUpdater) GenerateDiff(oldContent, newContent string) string {
 		if i < len(newLines) {
 			newLine = newLines[i]
 		}
-
+		
 		if oldLine != newLine {
+			// Начало или продолжение hunk
+			if currentHunk == nil {
+				currentHunk = &hunk{
+					oldStart: oldLineNum,
+					newStart: newLineNum,
+					oldLines: []string{},
+					newLines: []string{},
+				}
+			}
+			
 			if oldLine != "" {
-				diff.WriteString(fmt.Sprintf("-%s\n", oldLine))
+				currentHunk.oldLines = append(currentHunk.oldLines, oldLine)
+				currentHunk.oldEnd = oldLineNum
 			}
 			if newLine != "" {
-				diff.WriteString(fmt.Sprintf("+%s\n", newLine))
+				currentHunk.newLines = append(currentHunk.newLines, newLine)
+				currentHunk.newEnd = newLineNum
 			}
 		} else {
-			diff.WriteString(fmt.Sprintf(" %s\n", newLine))
+			// Неизмененная строка
+			if currentHunk != nil {
+				// Завершаем текущий hunk
+				hunks = append(hunks, *currentHunk)
+				currentHunk = nil
+			}
+		}
+		
+		if oldLine != "" {
+			oldLineNum++
+		}
+		if newLine != "" {
+			newLineNum++
 		}
 	}
-
+	
+	// Добавляем последний hunk, если есть
+	if currentHunk != nil {
+		hunks = append(hunks, *currentHunk)
+	}
+	
+	// Формируем unified diff с контекстом
+	for _, h := range hunks {
+		// Вычисляем начало с учетом контекста
+		oldContextStart := h.oldStart - contextLines
+		if oldContextStart < 1 {
+			oldContextStart = 1
+		}
+		newContextStart := h.newStart - contextLines
+		if newContextStart < 1 {
+			newContextStart = 1
+		}
+		
+		// Вычисляем конец с учетом контекста
+		oldContextEnd := h.oldEnd + contextLines
+		if oldContextEnd > len(oldLines) {
+			oldContextEnd = len(oldLines)
+		}
+		newContextEnd := h.newEnd + contextLines
+		if newContextEnd > len(newLines) {
+			newContextEnd = len(newLines)
+		}
+		
+		// Заголовок hunk
+		oldCount := oldContextEnd - oldContextStart + 1
+		newCount := newContextEnd - newContextStart + 1
+		diff.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n", oldContextStart, oldCount, newContextStart, newCount))
+		
+		// Контекстные строки до изменений
+		for i := oldContextStart - 1; i < h.oldStart-1 && i < len(oldLines); i++ {
+			if i >= 0 {
+				diff.WriteString(fmt.Sprintf(" %s\n", oldLines[i]))
+			}
+		}
+		
+		// Измененные строки
+		oldHunkIdx := 0
+		newHunkIdx := 0
+		
+		for oldHunkIdx < len(h.oldLines) || newHunkIdx < len(h.newLines) {
+			if oldHunkIdx < len(h.oldLines) && newHunkIdx < len(h.newLines) {
+				// Измененная строка
+				diff.WriteString(fmt.Sprintf("-%s\n", h.oldLines[oldHunkIdx]))
+				diff.WriteString(fmt.Sprintf("+%s\n", h.newLines[newHunkIdx]))
+				oldHunkIdx++
+				newHunkIdx++
+			} else if oldHunkIdx < len(h.oldLines) {
+				// Удаленная строка
+				diff.WriteString(fmt.Sprintf("-%s\n", h.oldLines[oldHunkIdx]))
+				oldHunkIdx++
+			} else if newHunkIdx < len(h.newLines) {
+				// Добавленная строка
+				diff.WriteString(fmt.Sprintf("+%s\n", h.newLines[newHunkIdx]))
+				newHunkIdx++
+			}
+		}
+		
+		// Контекстные строки после изменений
+		contextEnd := h.oldEnd + contextLines
+		if contextEnd > len(oldLines) {
+			contextEnd = len(oldLines)
+		}
+		for i := h.oldEnd; i < contextEnd && i < len(oldLines); i++ {
+			diff.WriteString(fmt.Sprintf(" %s\n", oldLines[i]))
+		}
+	}
+	
 	return diff.String()
+}
+
+// hunk представляет группу изменений в unified diff
+type hunk struct {
+	oldStart int
+	oldEnd   int
+	newStart int
+	newEnd   int
+	oldLines []string
+	newLines []string
 }
 
 // ApplyUpdate применяет обновление

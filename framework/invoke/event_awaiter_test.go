@@ -195,3 +195,70 @@ func TestEventAwaiter_AwaitSuccessOrError(t *testing.T) {
 	}
 }
 
+// TestEventAwaiter_Await_Unsubscribe проверяет, что подписчики отписываются после завершения ожидания
+func TestEventAwaiter_Await_Unsubscribe(t *testing.T) {
+	ctx := context.Background()
+	mockBus := NewMockEventBus()
+	awaiter := NewEventAwaiterFromEventBus(mockBus)
+	defer awaiter.Stop(ctx)
+
+	correlationID := "test-correlation-id"
+	eventType := "test_event"
+
+	// Выполняем несколько вызовов Await
+	for i := 0; i < 5; i++ {
+		// Запускаем goroutine для публикации события
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			event := NewTestEvent("test data")
+			event.WithCorrelationID(correlationID)
+			_ = mockBus.Publish(ctx, event)
+		}()
+
+		_, err := awaiter.Await(ctx, correlationID, eventType, 5*time.Second)
+		if err != nil {
+			t.Fatalf("unexpected error on iteration %d: %v", i, err)
+		}
+
+		// Проверяем, что количество подписчиков не растёт
+		// После каждого Await должен оставаться только один активный подписчик (если есть активные waiters)
+		// или ноль (если все waiters завершены)
+		// В MockEventBus мы можем проверить количество handlers
+		handlers := mockBus.handlers[eventType]
+		// После отписки количество handlers должно быть 0 или 1 (если есть активный waiter)
+		if len(handlers) > 1 {
+			t.Errorf("iteration %d: expected at most 1 handler after unsubscribe, got %d", i, len(handlers))
+		}
+	}
+
+	// После всех вызовов не должно быть активных подписчиков
+	handlers := mockBus.handlers[eventType]
+	if len(handlers) > 0 {
+		t.Errorf("expected 0 handlers after all awaits completed, got %d", len(handlers))
+	}
+}
+
+// TestEventAwaiter_Await_Timeout_Unsubscribe проверяет отписку при timeout
+func TestEventAwaiter_Await_Timeout_Unsubscribe(t *testing.T) {
+	ctx := context.Background()
+	mockBus := NewMockEventBus()
+	awaiter := NewEventAwaiterFromEventBus(mockBus)
+	defer awaiter.Stop(ctx)
+
+	correlationID := "test-correlation-id"
+	eventType := "test_event"
+
+	// Выполняем несколько вызовов Await с timeout
+	for i := 0; i < 3; i++ {
+		_, err := awaiter.Await(ctx, correlationID, eventType, 50*time.Millisecond)
+		if err == nil {
+			t.Fatalf("iteration %d: expected timeout error", i)
+		}
+
+		// Проверяем, что подписчики отписаны после timeout
+		handlers := mockBus.handlers[eventType]
+		if len(handlers) > 0 {
+			t.Errorf("iteration %d: expected 0 handlers after timeout, got %d", i, len(handlers))
+		}
+	}
+}

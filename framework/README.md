@@ -60,11 +60,15 @@ go get potter/framework
 
 ### Базовый пример
 
+**Рекомендуемый способ**: Использование DI-контейнера для сборки приложений.
+
 ```go
 package main
 
 import (
     "context"
+    "log"
+    "potter/framework/container"
     "potter/framework/cqrs"
     "potter/framework/transport"
 )
@@ -93,7 +97,19 @@ func (h *CreateUserHandler) CommandName() string {
 }
 
 func main() {
-    // Создаем реестр и шину
+    ctx := context.Background()
+    
+    // Создаем контейнер через builder
+    builder := container.NewContainerBuilder(&container.Config{}).
+        WithDefaults()
+    
+    c, err := builder.Build(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer c.Shutdown(ctx)
+    
+    // Получаем компоненты из контейнера
     registry := cqrs.NewRegistry()
     commandBus := transport.NewInMemoryCommandBus()
     
@@ -102,11 +118,12 @@ func main() {
     cqrs.RegisterCommandHandler(registry, commandBus, handler)
     
     // Отправляем команду
-    ctx := context.Background()
     cmd := CreateUserCommand{Name: "John", Email: "john@example.com"}
     _ = commandBus.Send(ctx, cmd)
 }
 ```
+
+**Примечание**: `framework.New()` и `BaseFramework` помечены как deprecated и будут удалены в версии 2.0.0. Используйте `framework/container` для инициализации приложений.
 
 ## Пакеты фреймворка
 
@@ -118,9 +135,21 @@ func main() {
 - `Component` - базовый интерфейс для всех компонентов
 - `Lifecycle` - управление жизненным циклом
 - `Configurable` - конфигурируемые компоненты
-- `Error` - система ошибок фреймворка
+- `FrameworkError` - система ошибок фреймворка (см. `framework/core/errors.go`)
 - `Result[T]` - generic тип для результатов
 - `Option[T]` - generic тип для опциональных значений
+
+**Работа с ошибками:**
+```go
+// Создание новой ошибки
+err := core.NewError(core.ErrNotFound, "resource not found")
+
+// Оборачивание существующей ошибки
+err := core.Wrap(originalErr, core.ErrInvalidConfig, "invalid configuration")
+
+// Оборачивание с кодом
+err := core.WrapWithCode(originalErr, core.ErrInitializationFailed)
+```
 
 ### framework/cqrs
 
@@ -281,16 +310,56 @@ make test-integration
 - `framework/adapters/repository/inmemory_test.go` - примеры работы с репозиториями
 - `framework/cqrs/registry_test.go` - примеры регистрации обработчиков
 
-### Написание тестов для приложений
+### Testing Applications
 
-При написании тестов для приложений на базе фреймворка:
+Фреймворк предоставляет пакет `framework/testing` с готовыми утилитами для тестирования приложений.
 
-1. Используйте `InMemoryRepository` для тестирования без внешних зависимостей
-2. Используйте `InMemoryCommandBus` и `InMemoryQueryBus` для изоляции тестов
-3. Используйте `InMemoryEventPublisher` для проверки публикации событий
-4. Мокируйте внешние зависимости через интерфейсы
+#### Использование InMemoryTestEnvironment
 
-Пример:
+`InMemoryTestEnvironment` предоставляет готовую тестовую среду со всеми необходимыми компонентами:
+
+```go
+import "potter/framework/testing"
+
+func TestCreateUserHandler(t *testing.T) {
+    // Создаем тестовую среду
+    env := testing.NewInMemoryTestEnvironment()
+    defer env.Shutdown(context.Background())
+    
+    // Используем готовые компоненты
+    repo := repository.NewInMemoryRepository[User](repository.DefaultInMemoryConfig())
+    handler := command.NewCreateUserHandler(repo, env.EventBus)
+    
+    // Регистрируем handler
+    env.CommandBus.Register(handler)
+    
+    // Выполняем команду
+    cmd := CreateUserCommand{Name: "John", Email: "john@example.com"}
+    err := env.CommandBus.Send(context.Background(), cmd)
+    // assertions...
+}
+```
+
+#### Использование NewTestContainer
+
+Для тестирования с DI контейнером:
+
+```go
+import "potter/framework/testing"
+
+func TestApplicationWithContainer(t *testing.T) {
+    container := testing.NewTestContainer()
+    defer container.Shutdown(context.Background())
+    
+    // Получаем компоненты из контейнера
+    // ...
+}
+```
+
+#### Ручное создание компонентов
+
+Для более тонкого контроля можно создавать компоненты вручную:
+
 ```go
 func TestCreateUserHandler(t *testing.T) {
     repo := repository.NewInMemoryRepository[User](repository.DefaultInMemoryConfig())
@@ -412,20 +481,13 @@ adapter, err := messagebus.NewRedisAdapter(config)
 
 ## Roadmap
 
-- [ ] Поддержка Event Sourcing
-- [ ] Поддержка Saga Pattern через FSM
-- [x] Интеграция с популярными message brokers (Kafka, Redis)
-- [ ] Поддержка GraphQL транспорта
-- [ ] Автоматическая генерация OpenAPI спецификаций
-- [x] Поддержка WebSocket транспорта
-- [ ] Расширенная поддержка distributed tracing
-- [x] Интеграция с популярными базами данных (PostgreSQL, MongoDB)
+См. [ROADMAP.md](../../ROADMAP.md) для детального плана развития фреймворка.
 
 ## Версионирование
 
 Проект следует [Semantic Versioning](https://semver.org/).
 
-Текущая версия: **1.1.0**
+Текущая версия: см. файл [`VERSION`](../../VERSION) в корне проекта.
 
 ## Лицензия
 
@@ -437,6 +499,5 @@ Potter Team
 
 ## Дополнительная документация
 
-- [CQRS README](../pkg/cqrs/README.md) - подробная документация по CQRS (deprecated, см. framework/cqrs)
 - [CHANGELOG](../CHANGELOG.md) - история изменений
 
