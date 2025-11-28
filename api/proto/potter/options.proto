@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package potter;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "potter/api/proto/potter";
+
+// Potter custom options для аннотации CQRS компонентов
+
+// CommandOptions аннотация для RPC метода, представляющего Command
+extend google.protobuf.MethodOptions {
+  optional CommandOptions command = 50001;
+}
+
+// QueryOptions аннотация для RPC метода, представляющего Query
+extend google.protobuf.MethodOptions {
+  optional QueryOptions query = 50002;
+}
+
+// EventOptions аннотация для message, представляющего Event
+extend google.protobuf.MessageOptions {
+  optional EventOptions event = 50001;
+}
+
+// AggregateOptions аннотация для message, представляющего Aggregate Root
+extend google.protobuf.MessageOptions {
+  optional AggregateOptions aggregate = 50002;
+}
+
+// ValueObjectOptions аннотация для message, представляющего Value Object
+extend google.protobuf.MessageOptions {
+  optional ValueObjectOptions value_object = 50003;
+}
+
+// ErrorEventOptions аннотация для message, представляющего Error Event
+extend google.protobuf.MessageOptions {
+  optional ErrorEventOptions error_event = 50004;
+}
+
+// ServiceOptions аннотация для service с настройками модуля
+extend google.protobuf.ServiceOptions {
+  optional ServiceOptions service = 50001;
+}
+
+// CommandOptions настройки команды
+message CommandOptions {
+  string aggregate = 1;           // Имя агрегата, на который действует команда
+  bool async = 2;                 // Асинхронное выполнение команды
+  bool idempotent = 3;             // Идемпотентность команды
+  int32 timeout_seconds = 4;      // Таймаут выполнения команды в секундах
+}
+
+// QueryOptions настройки запроса
+message QueryOptions {
+  bool cacheable = 1;             // Можно ли кешировать результат
+  int32 cache_ttl_seconds = 2;    // TTL кеша в секундах
+  string read_model = 3;          // Имя read model для запроса
+}
+
+// EventOptions настройки события
+message EventOptions {
+  string event_type = 1;          // Тип события (например, "product.created")
+  string aggregate = 2;           // Имя агрегата, который генерирует событие
+  int32 version = 3;              // Версия события
+}
+
+// AggregateOptions настройки агрегата
+message AggregateOptions {
+  string name = 1;                // Имя агрегата
+  string repository = 2;          // Тип репозитория (postgres, mongodb, inmemory)
+}
+
+// ValueObjectOptions настройки value object
+message ValueObjectOptions {
+  // Пустое сообщение, используется только как маркер
+}
+
+// ErrorEventOptions настройки события об ошибке
+message ErrorEventOptions {
+  string error_code = 1;          // Код ошибки (например, "PRODUCT_CREATION_FAILED")
+  bool retryable = 2;             // Можно ли повторить операцию
+}
+
+// ServiceOptions настройки сервиса
+message ServiceOptions {
+  string module_name = 1;        // Имя модуля (используется для генерации путей)
+  repeated string transport = 2;  // Список транспортов (REST, gRPC, NATS, Kafka)
+}
+

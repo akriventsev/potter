@@ -1,0 +1,130 @@
+syntax = "proto3";
+package example;
+
+import "potter/options.proto";
+
+option go_package = "example/api";
+
+// SimpleService демонстрирует базовое использование Potter кодогенератора
+service SimpleService {
+  option (potter.service) = {
+    module_name: "simple"
+    transport: ["REST", "NATS"]
+  };
+
+  // CreateItem создает новый item
+  rpc CreateItem(CreateItemRequest) returns (CreateItemResponse) {
+    option (potter.command) = {
+      aggregate: "Item"
+      async: true
+      idempotent: true
+      timeout_seconds: 30
+    };
+  }
+
+  // GetItem получает item по ID
+  rpc GetItem(GetItemRequest) returns (GetItemResponse) {
+    option (potter.query) = {
+      cacheable: true
+      cache_ttl_seconds: 300
+      read_model: "ItemReadModel"
+    };
+  }
+
+  // UpdateItem обновляет item
+  rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse) {
+    option (potter.command) = {
+      aggregate: "Item"
+      async: false
+    };
+  }
+
+  // ListItems возвращает список items
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse) {
+    option (potter.query) = {
+      cacheable: false
+    };
+  }
+}
+
+// Item aggregate
+message Item {
+  option (potter.aggregate) = {
+    name: "Item"
+    repository: "postgres"
+  };
+
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 quantity = 4;
+}
+
+// ItemCreatedEvent событие создания item
+message ItemCreatedEvent {
+  option (potter.event) = {
+    event_type: "item.created"
+    aggregate: "Item"
+    version: 1
+  };
+
+  string item_id = 1;
+  string name = 2;
+  string description = 3;
+  int32 quantity = 4;
+}
+
+// ItemCreationFailedEvent событие ошибки создания
+message ItemCreationFailedEvent {
+  option (potter.error_event) = {
+    error_code: "ITEM_CREATION_FAILED"
+    retryable: false
+  };
+
+  string reason = 1;
+  string details = 2;
+}
+
+message CreateItemRequest {
+  string name = 1;
+  string description = 2;
+  int32 quantity = 3;
+}
+
+message CreateItemResponse {
+  string item_id = 1;
+  string message = 2;
+}
+
+message GetItemRequest {
+  string id = 1;
+}
+
+message GetItemResponse {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 quantity = 4;
+}
+
+message UpdateItemRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 quantity = 4;
+}
+
+message UpdateItemResponse {
+  string message = 1;
+}
+
+message ListItemsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message ListItemsResponse {
+  repeated Item items = 1;
+  int32 total = 2;
+}
+
