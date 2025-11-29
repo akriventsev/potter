@@ -1,28 +1,36 @@
 # Event Sourcing Replay Example
 
-Пример Event Replay и rebuilding проекций из event store.
+Пример Event Replay и rebuilding проекций из event store с использованием нового API ProjectionManager.
 
 ## Описание
 
-Этот пример демонстрирует различные сценарии replay событий для перестроения read models (проекций) из event store.
+Этот пример демонстрирует различные сценарии replay событий для перестроения read models (проекций) из event store с использованием `ProjectionManager` и интерфейса `eventsourcing.Projection`.
+
+## API
+
+Пример использует `ProjectionManager` для управления проекциями:
+
+- **ProjectionManager** - управляет жизненным циклом проекций
+- **Интерфейс Projection** - каждая проекция реализует `Name()`, `HandleEvent()` и `Reset()`
+- **CheckpointStore** - автоматическое сохранение позиции обработки
+- **Rebuild()** - пересоздание проекции с нуля
+- **Автоматическое восстановление** - после перезапуска проекции продолжают с последней позиции
 
 ## Use Cases
 
-1. **Полный replay** - перестроение всех проекций из всех событий
+1. **Полный replay** - перестроение всех проекций из всех событий через ProjectionManager
 2. **Replay агрегата** - перестроение проекции для конкретного агрегата
-3. **Replay с фильтрацией** - replay только определенных типов событий
+3. **Rebuild проекции** - пересоздание конкретной проекции с нуля
 4. **Replay с момента времени** - replay событий с определенного момента
-5. **Progress tracking** - отслеживание прогресса во время replay
-6. **Batch processing** - обработка событий батчами для оптимизации
+5. **Checkpoint восстановление** - автоматическое восстановление позиции после перезапуска
 
 ## Архитектура
 
 - `domain/order.go` - Event Sourced агрегат Order
 - `domain/events.go` - события заказов
-- `projections/order_summary.go` - read model проекция для сводки заказов
-- `projections/customer_stats.go` - проекция статистики клиентов
-- `application/replay_service.go` - сервис для replay операций
-- `cmd/replay/main.go` - CLI для различных сценариев replay
+- `projections/order_summary.go` - read model проекция (реализует `eventsourcing.Projection`)
+- `projections/customer_stats.go` - проекция статистики клиентов (реализует `eventsourcing.Projection`)
+- `cmd/replay/main.go` - CLI для различных сценариев replay с ProjectionManager
 
 ## Quick Start
 
@@ -46,12 +54,15 @@ make run   # Запустить полный replay
 ./bin/replay -command=replay-aggregate -aggregate-id=order-123
 ```
 
-### Rebuild конкретной проекции
+### Rebuild конкретной проекции (новый API)
 
 ```bash
+# Использует ProjectionManager.Rebuild() для пересоздания проекции
 ./bin/replay -command=replay-projection -projection=order_summary
 ./bin/replay -command=replay-projection -projection=customer_stats
 ```
+
+Проекция будет сброшена (`Reset()`) и пересоздана из всех событий.
 
 ### Replay с определенного момента
 

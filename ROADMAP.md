@@ -2,14 +2,35 @@
 
 План развития Potter Framework.
 
-## Completed (v1.0.x - v1.3.x)
+> **Текущая версия:** 1.3.1  
+> **Следующий релиз:** 1.4.0 (все функции реализованы, ожидается публикация)
 
-- ✅ Event Sourcing with Postgres/MongoDB
-- ✅ Saga Pattern with FSM
-- ✅ CQRS Invoke Module
-- ✅ Code Generator from Protobuf
+## Версия 1.0.0 ✅
 
-## Версия 1.3.0
+- [x] Базовая структура фреймворка
+- [x] CQRS Framework
+- [x] Transport Layer
+- [x] Events System
+- [x] Container (DI)
+- [x] Metrics
+- [x] FSM
+
+## Версия 1.1.0 ✅
+
+- [x] Invoke Module для type-safe работы с CQRS
+- [x] Event Sourcing базовая поддержка
+- [x] Метрики OpenTelemetry
+
+## Версия 1.2.0 ✅
+
+- [x] Интеграция с популярными message brokers (Kafka, Redis)
+- [x] Поддержка WebSocket транспорта
+- [x] Интеграция с популярными базами данных (PostgreSQL, MongoDB)
+- [x] Code Generator с incremental updates
+- [x] Invoke Module с type-safe API
+- [x] Testing utilities для приложений
+
+## Версия 1.3.0 ✅
 
 ### Event Sourcing
 - [x] Полная поддержка Event Sourcing паттерна
@@ -25,18 +46,87 @@
 - [x] Удален неполный SagaQueryHandler
 - [x] Очищены TODO комментарии в production коде
 
-## In Progress (v1.1.x)
+## Версия 1.3.x ✅
 
-- 🔄 Query Builder for Repositories
-- 🔄 Schema Migrations
-- 🔄 Advanced Indexing
+### Saga Pattern
+- [x] Saga Pattern полная реализация
+- [x] SagaOrchestrator с автоматической компенсацией
+- [x] SagaStep с forward/compensate actions
+- [x] Persistence через EventStore и PostgreSQL
+- [x] Интеграция с CQRS (CommandBus, QueryBus)
+- [x] Интеграция с EventBus для saga events
+- [x] Интеграция с 2PC координатором
+- [x] Retry механизм с exponential backoff
+- [x] Timeout и cancellation support
+- [x] Comprehensive документация и примеры
+- [x] Order Saga example
+- [x] Warehouse 2PC integration example
+- [x] Полное покрытие unit и integration тестами
+
+## Версия 1.4.0 ✅
+
+### Repository Enhancements
+- ✅ Query Builder для Postgres и MongoDB с fluent API
+- ✅ Schema Migrations с версионированием и rollback (PostgreSQL only, MongoDB migrations experimental)
+- ✅ Advanced Indexing с автоматическим управлением и рекомендациями
+- ✅ TTL поддержка для MongoDB репозиториев
+- ✅ Change Streams для реактивных обновлений в MongoDB
+
+### Saga Pattern Enhancements
+- ✅ Saga Query Handler с CQRS read models
+- ✅ Read model infrastructure для оптимизированных запросов
+- ✅ Projection для обновления read models из saga events
+
+### Event Sourcing Enhancements
+- ✅ Projection framework с checkpoint management
+- ✅ Automatic projection registration и lifecycle management
+- ✅ Rebuild support для проекций
+- ✅ PostgreSQL и MongoDB checkpoint stores
+
+### Tooling
+- ✅ potter-migrate CLI для управления миграциями
+- ✅ Интеграция миграций с codegen
+
+### Покрытие примерами (v1.4.0)
+
+✅ **Saga Pattern** - полное покрытие всех типов шагов:
+
+  - Базовые шаги: `saga-order`, `saga-warehouse-integration`
+
+  - Параллельные шаги: `saga-parallel`
+
+  - Условные шаги: `saga-conditional`
+
+  - 2PC интеграция: `saga-warehouse-integration`
+
+  - Query Handler с read models: `saga-query-handler`
+
+
+
+✅ **Event Sourcing** - полное покрытие возможностей:
+
+  - Базовые операции: `eventsourcing-basic`
+
+  - Snapshot стратегии: `eventsourcing-snapshots` (Frequency, TimeBased, Hybrid)
+
+  - Event Replay: `eventsourcing-replay` (full, aggregate-specific, filtered)
+
+  - MongoDB persistence: `eventsourcing-mongodb`
+
+  - Projections: все примеры используют projection framework
+
+
+
+✅ **Repository** - демонстрация Query Builder и индексов:
+
+  - `repository-query-builder` - сложные запросы, joins, агрегация, full-text search
 
 ## Planned (v1.2.x+)
 
-- ⏳ EventStoreDB Adapter (pending stable Go client)
-- ⏳ Saga Query Handler with Read Models
-- ⏳ TTL and Change Streams for MongoDB
-- ⏳ Projections and Read Models
+- ⏳ EventStoreDB Adapter (pending stable Go client v21.2+)
+  - Базовая реализация готова в `framework/eventsourcing/eventstoredb_store.go` (249 строк кода с полной структурой), ожидает интеграции со стабильным официальным Go client
+  - Требуется стабильная версия официального Go client
+  - Comprehensive тесты с testcontainers
 
 ### GraphQL Transport
 - [ ] GraphQL транспорт для запросов
@@ -85,59 +175,22 @@
 - [ ] Видео-курсы и вебинары
 - [ ] Best practices guide для production deployments
 
-## Завершенные задачи
+## Завершенные версии
 
-### Версия 1.3.x
-- [x] Saga Pattern полная реализация
-- [x] SagaOrchestrator с автоматической компенсацией
-- [x] SagaStep с forward/compensate actions
-- [x] Persistence через EventStore и PostgreSQL
-- [x] Интеграция с CQRS (CommandBus, QueryBus)
-- [x] Интеграция с EventBus для saga events
-- [x] Интеграция с 2PC координатором
-- [x] Retry механизм с exponential backoff
-- [x] Timeout и cancellation support
-- [x] Comprehensive документация и примеры
-- [x] Order Saga example
-- [x] Warehouse 2PC integration example
-- [x] Полное покрытие unit и integration тестами
+Все завершённые версии (v1.0.0 - v1.4.0) детально описаны в разделах выше. Основные достижения:
 
-### Версия 1.3.0
-- [x] Event Sourcing полная реализация
-- [x] EventStore с адаптерами (InMemory, PostgreSQL, MongoDB, EventStore DB)
-- [x] EventSourcedAggregate с replay механизмом
-- [x] Snapshot механизм с различными стратегиями
-- [x] Event replay и projection rebuilding
-- [x] Оптимистичная конкурентность через версионирование
-- [x] Comprehensive документация и примеры
-- [x] Integration с существующими компонентами фреймворка
-
-### Версия 1.2.0
-- [x] Интеграция с популярными message brokers (Kafka, Redis)
-- [x] Поддержка WebSocket транспорта
-- [x] Интеграция с популярными базами данных (PostgreSQL, MongoDB)
-- [x] Code Generator с incremental updates
-- [x] Invoke Module с type-safe API
-- [x] Testing utilities для приложений
-
-### Версия 1.1.0
-- [x] Invoke Module для type-safe работы с CQRS
-- [x] Event Sourcing базовая поддержка
-- [x] Метрики OpenTelemetry
-
-### Версия 1.0.0
-- [x] Базовая структура фреймворка
-- [x] CQRS Framework
-- [x] Transport Layer
-- [x] Events System
-- [x] Container (DI)
-- [x] Metrics
-- [x] FSM
+- **v1.0.0**: Базовая структура фреймворка, CQRS, Transport, Events, Container, Metrics, FSM
+- **v1.1.0**: Invoke Module, базовая поддержка Event Sourcing, OpenTelemetry метрики
+- **v1.2.0**: Интеграция с message brokers и базами данных, Code Generator, Testing utilities
+- **v1.3.0**: Полная реализация Event Sourcing с адаптерами, snapshots, replay
+- **v1.3.x**: Полная реализация Saga Pattern с FSM, компенсацией, интеграциями
+- **v1.4.0**: Repository enhancements, Saga Query Handler, Projection framework, Tooling
 
 ## Приоритеты
 
-1. **Высокий приоритет**: Event Sourcing, Saga Pattern, GraphQL Transport
-2. **Средний приоритет**: OpenAPI генерация, расширенный distributed tracing
+1. **Высокий приоритет**: GraphQL Transport, OpenAPI генерация
+   - Event Sourcing и Saga Pattern полностью реализованы в v1.4.0
+2. **Средний приоритет**: Расширенный distributed tracing
 3. **Низкий приоритет**: WebAssembly, multi-tenancy, serverless support
 
 ## Обратная связь

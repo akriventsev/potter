@@ -128,14 +128,15 @@ func (h *SagaCommandHandler) CommandName() string {
 	return "StartSaga"
 }
 
-// TODO: Query handler для получения статуса саги будет добавлен в следующих версиях.
-// Планируется реализация SagaQueryHandler с поддержкой CQRS read models для получения
-// статуса и истории выполнения саги. См. ROADMAP.md для отслеживания прогресса.
+// SagaQueryHandler для получения статуса и истории саг через CQRS QueryBus.
 // 
-// Запланированный API:
-//   type SagaQueryHandler struct {
-//       persistence SagaPersistence
-//   }
+// Пример использования:
+//   queryHandler := saga.NewSagaQueryHandler(persistence, readModelStore)
+//   queryBus.RegisterHandler("GetSagaStatus", queryHandler)
 //   
-//   func (h *SagaQueryHandler) Handle(ctx context.Context, q transport.Query) (interface{}, error)
+//   query := &saga.GetSagaStatusQuery{SagaID: "saga-123"}
+//   result, err := queryBus.Send(ctx, query)
+//   status := result.(*saga.SagaStatusResponse)
+// 
+// См. framework/saga/query_handler.go для полного API.
 

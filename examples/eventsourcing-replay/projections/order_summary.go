@@ -28,7 +28,12 @@ func NewOrderSummaryProjection() *OrderSummaryProjection {
 	}
 }
 
-// HandleEvent обрабатывает событие для обновления проекции
+// Name возвращает имя проекции
+func (p *OrderSummaryProjection) Name() string {
+	return "OrderSummaryProjection"
+}
+
+// HandleEvent обрабатывает событие для обновления проекции (реализация eventsourcing.Projection)
 func (p *OrderSummaryProjection) HandleEvent(ctx context.Context, event eventsourcing.StoredEvent) error {
 	orderID := event.AggregateID
 
@@ -81,4 +86,10 @@ func (p *OrderSummaryProjection) GetOrderSummary(orderID string) (*OrderSummary,
 // GetAllSummaries возвращает все сводки
 func (p *OrderSummaryProjection) GetAllSummaries() map[string]*OrderSummary {
 	return p.orders
+}
+
+// Reset сбрасывает состояние проекции
+func (p *OrderSummaryProjection) Reset(ctx context.Context) error {
+	p.orders = make(map[string]*OrderSummary)
+	return nil
 }

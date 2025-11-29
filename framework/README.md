@@ -291,6 +291,7 @@ fsm.Trigger(ctx, fsm.NewEvent("complete", nil))
 - 🗄️ **Multiple Adapters** - PostgreSQL, MongoDB, EventStore DB, InMemory
 - 🔐 **Optimistic Concurrency** - безопасная конкурентность через версионирование
 - 🎯 **Type-Safe** - generic репозитории и агрегаты
+- 📊 **Projections Framework** - централизованная инфраструктура для проекций с checkpoint management
 
 **Пример использования:**
 ```go
@@ -517,6 +518,107 @@ adapter, err := messagebus.NewRedisAdapter(config)
 - **NATS** - публикация событий через NATS с retry логикой
 - **Kafka** - event sourcing с гарантией порядка событий для агрегата
 - **MessageBus** - универсальный адаптер для любого message bus с batch publishing
+
+### framework/adapters/repository
+
+Generic репозитории для работы с различными storage backends.
+
+**Возможности:**
+- 🔍 **Query Builder** - fluent API для построения сложных запросов
+- 📊 **Advanced Indexing** - автоматическое управление индексами
+- ⏱️ **TTL Support** - автоматическая очистка для MongoDB
+- 🔄 **Change Streams** - реактивные обновления для MongoDB
+
+**Query Builder пример:**
+```go
+results, err := repo.Query().
+    Where("status", Eq, "active").
+    Where("created_at", Gte, time.Now().AddDate(0, -1, 0)).
+    OrderBy("created_at", Desc).
+    Limit(10).
+    Execute(ctx)
+```
+
+**Index Management пример:**
+```go
+indexMgr := repo.IndexManager()
+indexMgr.CreateIndex(ctx, IndexSpec{
+    Name: "idx_status_created_at",
+    Fields: []string{"status", "created_at"},
+})
+recommendations, _ := indexMgr.AnalyzeQueries(ctx)
+```
+
+**MongoDB TTL пример:**
+```go
+repo.EnableTTL("expires_at", 24*time.Hour)
+```
+
+**Change Streams пример:**
+```go
+watcher := repo.WatchChanges()
+changes, _ := watcher.WatchCollection(ctx)
+for change := range changes {
+    handleChange(change)
+}
+```
+
+### framework/migrations
+
+Версионированные миграции схемы базы данных с rollback поддержкой.
+
+**Возможности:**
+- 📝 **File-based Migrations** - миграции из SQL файлов (PostgreSQL)
+- 🔄 **Up/Down Support** - полная поддержка rollback
+- 🔒 **Concurrent Safety** - блокировки для предотвращения concurrent migrations
+- ✅ **Checksum Validation** - обнаружение изменений в примененных миграциях
+- 🛠️ **CLI Tool** - potter-migrate для управления миграциями
+
+**Примечание:** MongoDB миграции временно не поддерживаются в potter-migrate CLI. Базовая инфраструктура для MongoDB существует, но требует дополнительной реализации для поддержки JavaScript миграций.
+
+**Пример использования:**
+```bash
+potter-migrate up --database-url postgres://localhost/db
+potter-migrate down 1 --database-url postgres://localhost/db
+potter-migrate status --database-url postgres://localhost/db
+potter-migrate create add_user_roles
+```
+
+**Программное использование:**
+```go
+migrator := migrations.NewMigrator(migrations.NewPostgresMigrationDB(dsn))
+migrator.RegisterFromFiles("migrations")
+err := migrator.Up(ctx)
+```
+
+### framework/saga
+
+Механизмы для работы с сагами и оркестрацией распределенных транзакций.
+
+**Возможности:**
+- 🎯 **Saga Query Handler** - CQRS query handler для получения статуса и истории саг
+- 📊 **Read Models** - оптимизированные read models для быстрых запросов
+- 🔄 **Projections** - автоматическое обновление read models из saga events
+
+**Saga Query Handler пример:**
+```go
+queryHandler := saga.NewSagaQueryHandler(persistence, readModelStore)
+queryBus.RegisterHandler("GetSagaStatus", queryHandler)
+
+query := &saga.GetSagaStatusQuery{SagaID: "saga-123"}
+result, _ := queryHandler.Handle(ctx, query)
+status := result.(*saga.SagaStatusResponse)
+```
+
+**Read Model Store пример:**
+```go
+readModelStore, _ := saga.NewPostgresSagaReadModelStore(dsn)
+status, _ := readModelStore.GetSagaStatus(ctx, "saga-123")
+sagas, _ := readModelStore.ListSagas(ctx, saga.SagaFilter{
+    Status: &saga.SagaStatusRunning,
+    Limit: 10,
+})
+```
 
 ### Repository Adapters
 

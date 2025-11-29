@@ -158,6 +158,54 @@ make run
 
 **Документация:** [eventsourcing-mongodb/README.md](eventsourcing-mongodb/README.md)
 
+## Repository Examples
+
+### repository-query-builder
+
+Демонстрация Query Builder для Postgres и MongoDB репозиториев.
+
+**Ключевые особенности:**
+- Сложные запросы с фильтрацией, сортировкой, пагинацией
+- Joins между таблицами/коллекциями
+- Агрегация (Count, Sum, Avg, Min, Max)
+- Группировка с Having
+- Full-text search (MongoDB)
+- Geo queries (MongoDB)
+- Index management и performance optimization
+
+**Quick Start:**
+```bash
+cd examples/repository-query-builder
+make docker-up
+make migrate
+make run
+```
+
+**Документация:** [repository-query-builder/README.md](repository-query-builder/README.md)
+
+## Saga Query Handler Example
+
+### saga-query-handler
+
+Демонстрация SagaQueryHandler с CQRS read models.
+
+**Ключевые особенности:**
+- Query handler для получения статуса и истории саг
+- Read model store для оптимизированных запросов
+- Projection для обновления read models из saga events
+- REST API для запросов с фильтрацией и пагинацией
+- Метрики выполнения саг
+
+**Quick Start:**
+```bash
+cd examples/saga-query-handler
+make docker-up
+make migrate
+make run
+```
+
+**Документация:** [saga-query-handler/README.md](saga-query-handler/README.md)
+
 ## Покрытие функциональности
 
 ### Saga Pattern

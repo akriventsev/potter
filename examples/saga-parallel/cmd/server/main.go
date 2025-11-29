@@ -103,6 +103,7 @@ func main() {
 	}
 
 	orchestrator := saga.NewDefaultOrchestrator(sagaPersistence, eventPublisher)
+	orchestrator.WithRegistry(registry)
 
 	router := gin.Default()
 

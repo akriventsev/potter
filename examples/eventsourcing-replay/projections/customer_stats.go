@@ -27,7 +27,12 @@ func NewCustomerStatsProjection() *CustomerStatsProjection {
 	}
 }
 
-// HandleEvent обрабатывает событие для обновления проекции
+// Name возвращает имя проекции
+func (p *CustomerStatsProjection) Name() string {
+	return "CustomerStatsProjection"
+}
+
+// HandleEvent обрабатывает событие для обновления проекции (реализация eventsourcing.Projection)
 func (p *CustomerStatsProjection) HandleEvent(ctx context.Context, event eventsourcing.StoredEvent) error {
 	// Парсим данные события (EventData уже является events.Event)
 	eventJSON, err := json.Marshal(event.EventData)
@@ -72,5 +77,11 @@ func (p *CustomerStatsProjection) GetCustomerStats(customerID string) (*Customer
 // GetAllStats возвращает всю статистику
 func (p *CustomerStatsProjection) GetAllStats() map[string]*CustomerStats {
 	return p.customers
+}
+
+// Reset сбрасывает состояние проекции
+func (p *CustomerStatsProjection) Reset(ctx context.Context) error {
+	p.customers = make(map[string]*CustomerStats)
+	return nil
 }
 

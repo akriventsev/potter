@@ -10,7 +10,7 @@ import (
 //   - InMemory (для тестов)
 //   - Postgres (production-ready)
 //   - MongoDB (production-ready)
-// Поддержка EventStore DB планируется в будущих версиях при наличии стабильного Go клиента.
+//   - EventStoreDB (базовая реализация готова, требует стабильного Go клиента)
 type EventStoreFactory struct{}
 
 // NewEventStoreFactory создает новую фабрику Event Store
@@ -31,6 +31,11 @@ func (f *EventStoreFactory) CreatePostgres(config PostgresEventStoreConfig) (*Po
 // CreateMongoDB создает MongoDB Event Store
 func (f *EventStoreFactory) CreateMongoDB(config MongoDBEventStoreConfig) (*MongoDBEventStore, error) {
 	return NewMongoDBEventStore(config)
+}
+
+// CreateEventStoreDB создает EventStoreDB Event Store
+func (f *EventStoreFactory) CreateEventStoreDB(config EventStoreDBConfig) (*EventStoreDBStore, error) {
+	return NewEventStoreDBStore(config)
 }
 
 // SnapshotStoreFactory фабрика для создания Snapshot Store адаптеров

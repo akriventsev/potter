@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"potter/framework/core"
@@ -56,15 +57,14 @@ func DefaultPostgresConfig() PostgresConfig {
 
 // PostgresRepository[T Entity] generic PostgreSQL репозиторий.
 // 
-// Current implementation provides basic CRUD operations. Advanced features
-// (query builder, schema migrations, automatic indexing, TTL) are planned for
-// future releases. For complex queries, use raw SQL via GetByID with custom filters.
-// 
-// См. ROADMAP.md для отслеживания прогресса по планируемым улучшениям.
+// Provides basic CRUD operations and advanced query builder for complex queries.
+// См. framework/adapters/repository/query_builder.go для Query Builder API.
 type PostgresRepository[T Entity] struct {
-	config PostgresConfig
-	db     *pgx.Conn
-	mapper Mapper[T]
+	config         PostgresConfig
+	db             *pgx.Conn
+	mapper         Mapper[T]
+	indexManager   *PostgresIndexManager[T]
+	autoIndexManager *AutoIndexManager
 }
 
 // NewPostgresRepository создает новый PostgreSQL репозиторий
@@ -78,10 +78,18 @@ func NewPostgresRepository[T Entity](config PostgresConfig, mapper Mapper[T]) (*
 		return nil, fmt.Errorf("failed to connect to PostgreSQL: %w", err)
 	}
 
+	indexManager := NewPostgresIndexManager[T](conn, config)
+	
+	// Инициализируем AutoIndexManager с политикой по умолчанию (без автоматического создания)
+	policy := DefaultIndexPolicy()
+	autoIndexManager := NewAutoIndexManager(indexManager, policy)
+	
 	repo := &PostgresRepository[T]{
-		config: config,
-		db:     conn,
-		mapper: mapper,
+		config:         config,
+		db:             conn,
+		mapper:         mapper,
+		indexManager:   indexManager,
+		autoIndexManager: autoIndexManager,
 	}
 
 	return repo, nil
@@ -89,6 +97,24 @@ func NewPostgresRepository[T Entity](config PostgresConfig, mapper Mapper[T]) (*
 
 // Start запускает адаптер (реализация core.Lifecycle)
 func (p *PostgresRepository[T]) Start(ctx context.Context) error {
+	// Запускаем фоновую горутину для автоматической оптимизации индексов
+	if p.autoIndexManager != nil && p.autoIndexManager.policy.AutoCreate {
+		go func() {
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := p.autoIndexManager.AnalyzeAndOptimize(ctx); err != nil {
+						// Логируем ошибку, но продолжаем
+						fmt.Printf("AutoIndexManager optimization error: %v\n", err)
+					}
+				}
+			}
+		}()
+	}
 	return nil
 }
 
@@ -220,5 +246,34 @@ func (p *PostgresRepository[T]) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+// Query возвращает QueryBuilder для построения сложных запросов
+func (p *PostgresRepository[T]) Query() *PostgresQueryBuilder[T] {
+	builder := NewPostgresQueryBuilder[T](p.db, p.mapper, p.config)
+	// Передаем autoIndexManager если доступен
+	if p.autoIndexManager != nil {
+		builder.SetAutoIndexManager(p.autoIndexManager)
+	}
+	return builder
+}
+
+// IndexManager возвращает IndexManager для управления индексами
+func (p *PostgresRepository[T]) IndexManager() *PostgresIndexManager[T] {
+	return p.indexManager
+}
+
+// AutoIndexManager возвращает AutoIndexManager для автоматического управления индексами
+func (p *PostgresRepository[T]) AutoIndexManager() *AutoIndexManager {
+	if p.autoIndexManager == nil {
+		policy := DefaultIndexPolicy()
+		p.autoIndexManager = NewAutoIndexManager(p.indexManager, policy)
+	}
+	return p.autoIndexManager
+}
+
+// SetAutoIndexPolicy устанавливает политику автоматического управления индексами
+func (p *PostgresRepository[T]) SetAutoIndexPolicy(policy IndexPolicy) {
+	p.autoIndexManager = NewAutoIndexManager(p.indexManager, policy)
 }
 

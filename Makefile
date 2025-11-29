@@ -1,4 +1,4 @@
-.PHONY: test test-coverage test-unit test-integration lint clean deps example-warehouse example-warehouse-docker help example-eventsourcing-basic example-eventsourcing-docker example-eventsourcing-migrate test-eventsourcing benchmark-eventsourcing test-all example-saga-order example-saga-order-test example-saga-warehouse test-saga test-saga-integration benchmark-saga
+.PHONY: test test-coverage test-unit test-integration lint clean deps example-warehouse example-warehouse-docker help example-eventsourcing-basic example-eventsourcing-docker example-eventsourcing-migrate test-eventsourcing benchmark-eventsourcing test-all example-saga-order example-saga-order-test example-saga-warehouse test-saga test-saga-integration benchmark-saga install-potter-migrate
 
 # Тестирование
 test:
@@ -61,8 +61,14 @@ install-protoc-gen-potter:
 	@go install ./cmd/protoc-gen-potter
 	@echo "protoc-gen-potter installed successfully"
 
+# Установка potter-migrate CLI
+install-potter-migrate:
+	@echo "Installing potter-migrate..."
+	@go install ./cmd/potter-migrate
+	@echo "potter-migrate installed successfully"
+
 # Установка всех инструментов кодогенерации
-install-codegen-tools: install-potter-gen install-protoc-gen-potter
+install-codegen-tools: install-potter-gen install-protoc-gen-potter install-potter-migrate
 	@echo "All codegen tools installed"
 
 # Тестирование кодогенератора
@@ -149,7 +155,8 @@ help:
 	@echo "  make example-eventsourcing-migrate - Run Event Sourcing migrations"
 	@echo "  make test-eventsourcing      - Run Event Sourcing tests"
 	@echo "  make benchmark-eventsourcing - Run Event Sourcing benchmarks"
-	@echo "  make install-codegen-tools   - Install potter-gen and protoc-gen-potter"
+	@echo "  make install-codegen-tools   - Install potter-gen, protoc-gen-potter and potter-migrate"
+	@echo "  make install-potter-migrate   - Install potter-migrate CLI"
 	@echo "  make test-codegen            - Test code generator"
 	@echo "  make example-codegen         - Run codegen example"
 	@echo "  make clean-codegen           - Clean generated code"

@@ -59,6 +59,54 @@ func (o *DefaultOrchestrator) RegisterSaga(name string, definition SagaDefinitio
 	return o.registry.RegisterSaga(name, definition)
 }
 
+// StartSaga convenience-метод для запуска саги по имени definition
+// Автоматически получает definition из registry, создает instance и запускает выполнение
+func (o *DefaultOrchestrator) StartSaga(ctx context.Context, definitionName string, sagaCtx SagaContext) (Saga, error) {
+	if o.registry == nil {
+		return nil, fmt.Errorf("registry not configured")
+	}
+
+	// Получаем definition из registry
+	definition, err := o.registry.GetSaga(definitionName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get saga definition: %w", err)
+	}
+
+	// Создаем instance с persistence и eventBus
+	var instance Saga
+	if baseDef, ok := definition.(*BaseSagaDefinition); ok {
+		instance = baseDef.CreateInstanceWithPersistenceAndEventBus(ctx, sagaCtx, o.persistence, o.eventBus)
+	} else {
+		instance = definition.CreateInstance(ctx, sagaCtx)
+	}
+
+	if instance == nil {
+		return nil, fmt.Errorf("failed to create saga instance")
+	}
+
+	sagaID := instance.ID()
+
+	// Создаем контекст с отменой для саги заранее
+	sagaContext, cancel := context.WithCancel(ctx)
+	o.mu.Lock()
+	o.runningSagas[sagaID] = cancel
+	o.mu.Unlock()
+
+	// Запускаем выполнение в горутине для асинхронности
+	go func() {
+		if err := o.Execute(sagaContext, instance); err != nil {
+			// Ошибка уже залогирована в Execute
+		}
+	}()
+
+	return instance, nil
+}
+
+// RegisterDefinition алиас для RegisterSaga для обратной совместимости
+func (o *DefaultOrchestrator) RegisterDefinition(definition SagaDefinition) error {
+	return o.RegisterSaga(definition.Name(), definition)
+}
+
 // WithMetrics добавляет метрики к оркестратору
 func (o *DefaultOrchestrator) WithMetrics(m *metrics.Metrics) *DefaultOrchestrator {
 	o.metrics = m
@@ -75,11 +123,23 @@ func (o *DefaultOrchestrator) Execute(ctx context.Context, saga Saga) error {
 		baseSaga.mu.Unlock()
 	}
 
-	// Создаем контекст с отменой для саги
-	sagaCtx, cancel := context.WithCancel(ctx)
+	// Проверяем, есть ли уже контекст с отменой для этой саги
 	o.mu.Lock()
-	o.runningSagas[sagaID] = cancel
+	_, exists := o.runningSagas[sagaID]
 	o.mu.Unlock()
+
+	var sagaCtx context.Context
+	if exists {
+		// Контекст уже создан в StartSaga, используем переданный контекст
+		sagaCtx = ctx
+	} else {
+		// Создаем контекст с отменой для саги (для прямых вызовов Execute)
+		var cancel context.CancelFunc
+		sagaCtx, cancel = context.WithCancel(ctx)
+		o.mu.Lock()
+		o.runningSagas[sagaID] = cancel
+		o.mu.Unlock()
+	}
 
 	// Публикуем событие начала саги
 	if o.eventBus != nil {

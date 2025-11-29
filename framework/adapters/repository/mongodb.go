@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"potter/framework/core"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -12,12 +13,14 @@ import (
 
 // MongoConfig конфигурация для MongoDB репозитория
 type MongoConfig struct {
-	URI        string
-	Database   string
-	Collection string
-	Timeout    int // в секундах
+	URI         string
+	Database    string
+	Collection  string
+	Timeout     int // в секундах
 	MaxPoolSize int
 	MinPoolSize int
+	TTLField    string        // поле для TTL индекса
+	TTLDuration time.Duration // время жизни для TTL
 }
 
 // Validate проверяет корректность конфигурации
@@ -50,16 +53,14 @@ func DefaultMongoConfig() MongoConfig {
 
 // MongoRepository[T Entity] generic MongoDB репозиторий.
 // 
-// Current implementation provides basic CRUD operations with BSON serialization.
-// Advanced features (query builder, schema migrations, automatic indexing, TTL,
-// change streams) are planned for future releases. For complex queries, use MongoDB
-// aggregation pipeline via custom methods.
-// 
-// См. ROADMAP.md для отслеживания прогресса по планируемым улучшениям.
+// Provides basic CRUD operations with BSON serialization and advanced query builder.
+// См. framework/adapters/repository/query_builder.go для Query Builder API.
 type MongoRepository[T Entity] struct {
-	config     MongoConfig
-	client     *mongo.Client
-	collection *mongo.Collection
+	config             MongoConfig
+	client             *mongo.Client
+	collection         *mongo.Collection
+	indexManager       *MongoIndexManager[T]
+	changeStreamWatcher *MongoChangeStreamWatcher[T]
 }
 
 // NewMongoRepository создает новый MongoDB репозиторий
@@ -87,11 +88,21 @@ func NewMongoRepository[T Entity](config MongoConfig) (*MongoRepository[T], erro
 
 	collection := client.Database(config.Database).Collection(config.Collection)
 
-	return &MongoRepository[T]{
-		config:     config,
-		client:     client,
-		collection: collection,
-	}, nil
+	repo := &MongoRepository[T]{
+		config:       config,
+		client:       client,
+		collection:   collection,
+		indexManager: NewMongoIndexManager[T](collection, config),
+	}
+
+	// Автоматическое создание TTL индекса если указаны TTLField и TTLDuration
+	if config.TTLField != "" && config.TTLDuration > 0 {
+		if err := repo.EnableTTL(config.TTLField, config.TTLDuration); err != nil {
+			return nil, fmt.Errorf("failed to enable TTL: %w", err)
+		}
+	}
+
+	return repo, nil
 }
 
 // Start запускает адаптер (реализация core.Lifecycle)
@@ -101,6 +112,9 @@ func (m *MongoRepository[T]) Start(ctx context.Context) error {
 
 // Stop останавливает адаптер (реализация core.Lifecycle)
 func (m *MongoRepository[T]) Stop(ctx context.Context) error {
+	if m.changeStreamWatcher != nil {
+		_ = m.changeStreamWatcher.Close()
+	}
 	if m.client != nil {
 		return m.client.Disconnect(ctx)
 	}
@@ -187,5 +201,63 @@ func (m *MongoRepository[T]) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+// Query возвращает QueryBuilder для построения сложных запросов
+func (m *MongoRepository[T]) Query() *MongoQueryBuilder[T] {
+	return NewMongoQueryBuilder[T](m.collection, m.config)
+}
+
+// IndexManager возвращает IndexManager для управления индексами
+func (m *MongoRepository[T]) IndexManager() *MongoIndexManager[T] {
+	return m.indexManager
+}
+
+// EnableTTL включает TTL (Time-To-Live) для автоматической очистки документов
+func (m *MongoRepository[T]) EnableTTL(field string, duration time.Duration) error {
+	ctx := context.Background()
+	
+	// Создаем TTL индекс
+	indexModel := mongo.IndexModel{
+		Keys: map[string]interface{}{field: 1},
+		Options: options.Index().
+			SetExpireAfterSeconds(int32(duration.Seconds())).
+			SetName(fmt.Sprintf("ttl_%s", field)),
+	}
+
+	_, err := m.collection.Indexes().CreateOne(ctx, indexModel)
+	if err != nil {
+		return fmt.Errorf("failed to create TTL index: %w", err)
+	}
+
+	m.config.TTLField = field
+	m.config.TTLDuration = duration
+	return nil
+}
+
+// DisableTTL отключает TTL индекс
+func (m *MongoRepository[T]) DisableTTL() error {
+	if m.config.TTLField == "" {
+		return nil
+	}
+
+	ctx := context.Background()
+	indexName := fmt.Sprintf("ttl_%s", m.config.TTLField)
+	_, err := m.collection.Indexes().DropOne(ctx, indexName)
+	if err != nil {
+		return fmt.Errorf("failed to drop TTL index: %w", err)
+	}
+
+	m.config.TTLField = ""
+	m.config.TTLDuration = 0
+	return nil
+}
+
+// WatchChanges возвращает ChangeStreamWatcher для реактивных обновлений
+func (m *MongoRepository[T]) WatchChanges() *MongoChangeStreamWatcher[T] {
+	if m.changeStreamWatcher == nil {
+		m.changeStreamWatcher = NewMongoChangeStreamWatcher[T](m.collection)
+	}
+	return m.changeStreamWatcher
 }
 

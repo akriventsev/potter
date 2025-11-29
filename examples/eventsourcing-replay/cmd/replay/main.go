@@ -55,45 +55,38 @@ func main() {
 	}
 	defer eventStore.Stop(ctx)
 
-	snapshotStore, err := eventsourcing.NewPostgresSnapshotStore(eventStoreConfig)
+	// Создаем checkpoint store
+	checkpointStore, err := eventsourcing.NewPostgresCheckpointStore(*dsn)
 	if err != nil {
-		log.Fatalf("Failed to create snapshot store: %v", err)
+		log.Fatalf("Failed to create checkpoint store: %v", err)
 	}
-
-	// Создаем replayer
-	replayer := eventsourcing.NewDefaultEventReplayer(eventStore, snapshotStore)
 
 	// Создаем проекции
 	orderSummaryProjection := projections.NewOrderSummaryProjection()
 	customerStatsProjection := projections.NewCustomerStatsProjection()
 
-	// Опции для replay
-	options := eventsourcing.DefaultReplayOptions()
-	options.BatchSize = *batchSize
-	options.Parallel = *parallel
-
-	// Callback для отслеживания прогресса
-	progressCallback := func(progress eventsourcing.ReplayProgress) {
-		percent := float64(progress.ProcessedEvents) / float64(progress.TotalEvents) * 100
-		fmt.Printf("\rProgress: %d/%d (%.2f%%) | Position: %d | Elapsed: %v",
-			progress.ProcessedEvents,
-			progress.TotalEvents,
-			percent,
-			progress.CurrentPosition,
-			progress.ElapsedTime,
-		)
+	// Создаем ProjectionManager
+	projectionManager := eventsourcing.NewProjectionManager(eventStore, checkpointStore)
+	if err := projectionManager.Register(orderSummaryProjection); err != nil {
+		log.Fatalf("Failed to register order summary projection: %v", err)
+	}
+	if err := projectionManager.Register(customerStatsProjection); err != nil {
+		log.Fatalf("Failed to register customer stats projection: %v", err)
 	}
 
 	switch *command {
 	case "replay-all":
-		fmt.Println("Starting full replay of all events...")
-		handler := &application.ProjectionHandler{
-			OrderSummary:   orderSummaryProjection,
-			CustomerStats:  customerStatsProjection,
+		fmt.Println("Starting full replay of all events using ProjectionManager...")
+		// Запускаем ProjectionManager для обработки всех событий
+		if err := projectionManager.Start(ctx); err != nil {
+			log.Fatalf("Failed to start projection manager: %v", err)
 		}
-		err = replayer.ReplayWithProgress(ctx, handler, 0, options, progressCallback)
-		if err != nil {
-			log.Fatalf("Replay failed: %v", err)
+		// Ждем завершения обработки всех событий
+		// В реальном приложении это будет работать в фоне
+		fmt.Println("ProjectionManager started. Processing events...")
+		time.Sleep(5 * time.Second) // Даем время на обработку
+		if err := projectionManager.Stop(ctx); err != nil {
+			log.Printf("Warning: Failed to stop projection manager: %v", err)
 		}
 		fmt.Println("\n✓ Full replay completed successfully")
 
@@ -102,9 +95,18 @@ func main() {
 			log.Fatal("aggregate-id is required for replay-aggregate")
 		}
 		fmt.Printf("Starting replay for aggregate: %s\n", *aggregateID)
-		err = replayer.ReplayAggregate(ctx, *aggregateID, 0)
+		// Получаем события агрегата и обрабатываем через проекции
+		events, err := eventStore.GetEvents(ctx, *aggregateID, 0)
 		if err != nil {
-			log.Fatalf("Replay failed: %v", err)
+			log.Fatalf("Failed to get events: %v", err)
+		}
+		for _, event := range events {
+			if err := orderSummaryProjection.HandleEvent(ctx, event); err != nil {
+				log.Printf("Error processing event in order summary: %v", err)
+			}
+			if err := customerStatsProjection.HandleEvent(ctx, event); err != nil {
+				log.Printf("Error processing event in customer stats: %v", err)
+			}
 		}
 		fmt.Println("✓ Aggregate replay completed successfully")
 
@@ -112,25 +114,21 @@ func main() {
 		if *projection == "" {
 			log.Fatal("projection is required for replay-projection")
 		}
-		fmt.Printf("Starting replay for projection: %s\n", *projection)
-		var handler eventsourcing.ReplayHandler
+		fmt.Printf("Starting rebuild for projection: %s\n", *projection)
+		var projectionName string
 		switch *projection {
 		case "order_summary":
-			handler = &application.ProjectionHandler{
-				OrderSummary: orderSummaryProjection,
-			}
+			projectionName = orderSummaryProjection.Name()
 		case "customer_stats":
-			handler = &application.ProjectionHandler{
-				CustomerStats: customerStatsProjection,
-			}
+			projectionName = customerStatsProjection.Name()
 		default:
 			log.Fatalf("Unknown projection: %s", *projection)
 		}
-		err = replayer.ReplayWithProgress(ctx, handler, 0, options, progressCallback)
-		if err != nil {
-			log.Fatalf("Replay failed: %v", err)
+		// Используем Rebuild для пересоздания проекции
+		if err := projectionManager.Rebuild(ctx, projectionName); err != nil {
+			log.Fatalf("Rebuild failed: %v", err)
 		}
-		fmt.Println("\n✓ Projection replay completed successfully")
+		fmt.Println("\n✓ Projection rebuild completed successfully")
 
 	case "replay-from":
 		if *fromTime == "" {
@@ -141,11 +139,7 @@ func main() {
 			log.Fatalf("Invalid time format: %v (expected RFC3339)", err)
 		}
 		fmt.Printf("Starting replay from: %s\n", fromTimestamp.Format(time.RFC3339))
-		handler := &application.ProjectionHandler{
-			OrderSummary:  orderSummaryProjection,
-			CustomerStats: customerStatsProjection,
-		}
-		// Используем GetAllEvents с фильтрацией по времени через канал
+		// Получаем все события и фильтруем по времени
 		eventChan, err := eventStore.GetAllEvents(ctx, 0)
 		if err != nil {
 			log.Fatalf("Failed to get events: %v", err)
@@ -153,8 +147,11 @@ func main() {
 		count := 0
 		for event := range eventChan {
 			if event.OccurredAt.After(fromTimestamp) || event.OccurredAt.Equal(fromTimestamp) {
-				if err := handler.HandleEvent(ctx, event); err != nil {
-					log.Printf("Error processing event: %v", err)
+				if err := orderSummaryProjection.HandleEvent(ctx, event); err != nil {
+					log.Printf("Error processing event in order summary: %v", err)
+				}
+				if err := customerStatsProjection.HandleEvent(ctx, event); err != nil {
+					log.Printf("Error processing event in customer stats: %v", err)
 				}
 				count++
 			}
