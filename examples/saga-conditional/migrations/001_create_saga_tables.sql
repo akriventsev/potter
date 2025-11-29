@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS saga_instances (
     id UUID PRIMARY KEY,
     definition_name VARCHAR(255) NOT NULL,
@@ -24,4 +25,8 @@ CREATE TABLE IF NOT EXISTS saga_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_saga ON saga_history(saga_id);
+
+-- +goose Down
+DROP TABLE IF EXISTS saga_history CASCADE;
+DROP TABLE IF EXISTS saga_instances CASCADE;
 

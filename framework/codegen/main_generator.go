@@ -423,7 +423,7 @@ func (g *MainGenerator) generateREADME(_ *ParsedSpec, config *GeneratorConfig) e
 func (g *MainGenerator) generateGoMod(_ *ParsedSpec, config *GeneratorConfig) error {
 	content := fmt.Sprintf(`module %s
 
-go 1.21
+go 1.25.0
 
 require (
 	github.com/gin-gonic/gin v1.9.1

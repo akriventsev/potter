@@ -480,7 +480,7 @@ func (g *SDKGenerator) generateSDKGoMod(_ *ParsedSpec, config *GeneratorConfig) 
 	sdkModulePath := config.ModulePath + "-sdk"
 	content := fmt.Sprintf(`module %s
 
-go 1.21
+go 1.25.0
 
 require (
 	potter v0.0.0

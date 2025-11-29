@@ -28,19 +28,31 @@ docker-down: ## Остановить Docker Compose сервисы
 	@echo "$(GREEN)Остановка Docker Compose сервисов...$(NC)"
 	docker-compose down -v
 
-migrate-up: ## Применить миграции через potter-migrate
+migrate-up: ## Применить миграции
 	@echo "$(GREEN)Применение миграций...$(NC)"
-	@cd ../.. && go run cmd/potter-migrate/main.go up -d $(DATABASE_URL) -p examples/saga-query-handler/migrations || \
-		(echo "$(YELLOW)Warning: potter-migrate not available, using psql$(NC)" && \
-		PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -f migrations/001_create_tables.sql)
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations postgres "$(DATABASE_URL)" up
 	@echo "$(GREEN)Миграции применены$(NC)"
 
 migrate: migrate-up ## Алиас для migrate-up
 
 migrate-down: ## Откатить миграции
 	@echo "$(YELLOW)Откат миграций...$(NC)"
-	@PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -c "DROP TABLE IF EXISTS saga_history CASCADE; DROP TABLE IF EXISTS saga_instances CASCADE; DROP TABLE IF EXISTS projection_checkpoints CASCADE; DROP TABLE IF EXISTS public.snapshots CASCADE; DROP TABLE IF EXISTS public.event_store CASCADE;"
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations postgres "$(DATABASE_URL)" down
 	@echo "$(GREEN)Миграции откачены$(NC)"
+
+migrate-status: ## Показать статус миграций
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations postgres "$(DATABASE_URL)" status
+
+migrate-create: ## Создать новую миграцию (использование: make migrate-create NAME=migration_name)
+	@if [ -z "$(NAME)" ]; then \
+		echo "$(YELLOW)Error: NAME is required. Usage: make migrate-create NAME=migration_name$(NC)"; \
+		exit 1; \
+	fi
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations create $(NAME) sql
 
 run: ## Запустить сервер
 	@echo "$(GREEN)Запуск saga-query-handler сервера...$(NC)"

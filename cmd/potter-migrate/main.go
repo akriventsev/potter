@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"database/sql"
 	"flag"
 	"fmt"
 	"os"
@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"potter/framework/migrations"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func main() {
@@ -20,35 +22,51 @@ func main() {
 	command := os.Args[1]
 
 	// Парсим флаги
-	dbURL := flag.String("database-url", "", "Database connection string (postgres:// or mongodb://)")
+	dbURL := flag.String("database-url", "", "Database connection string (postgres://, mysql://, sqlite3://)")
 	migrationsDir := flag.String("migrations-dir", "./migrations", "Path to migrations directory")
+	dialect := flag.String("dialect", "", "Database dialect (postgres, mysql, sqlite3). Auto-detected from URL if not specified")
 	verbose := flag.Bool("verbose", false, "Verbose output")
-	dryRun := flag.Bool("dry-run", false, "Show SQL without executing")
+	dryRun := flag.Bool("dry-run", false, "Show what would be done without executing")
 
 	flag.CommandLine.Parse(os.Args[2:])
 
-	if *dbURL == "" {
+	if *dbURL == "" && command != "create" && command != "validate" {
 		fmt.Fprintf(os.Stderr, "Error: --database-url is required\n")
 		os.Exit(1)
 	}
 
-	ctx := context.Background()
+	// Определяем диалект из URL если не указан
+	if *dialect == "" && *dbURL != "" {
+		*dialect = detectDialect(*dbURL)
+	}
+
+	// Устанавливаем диалект (SetDialect установит postgres по умолчанию, если не указан)
+	if err := migrations.SetDialect(*dialect); err != nil {
+		fmt.Fprintf(os.Stderr, "Error setting dialect: %v\n", err)
+		os.Exit(1)
+	}
 
 	switch command {
 	case "up":
-		runUp(ctx, *dbURL, *migrationsDir, *verbose, *dryRun)
-	case "down":
-		steps := 1
+		steps := int64(0) // 0 означает применить все
 		if len(flag.Args()) > 0 {
-			if n, err := strconv.Atoi(flag.Args()[0]); err == nil {
+			if n, err := strconv.ParseInt(flag.Args()[0], 10, 64); err == nil {
 				steps = n
 			}
 		}
-		runDown(ctx, *dbURL, *migrationsDir, steps, *verbose, *dryRun)
+		runUp(*dbURL, *migrationsDir, steps, *verbose, *dryRun)
+	case "down":
+		steps := int64(1)
+		if len(flag.Args()) > 0 {
+			if n, err := strconv.ParseInt(flag.Args()[0], 10, 64); err == nil {
+				steps = n
+			}
+		}
+		runDown(*dbURL, *migrationsDir, steps, *verbose, *dryRun)
 	case "status":
-		runStatus(ctx, *dbURL, *migrationsDir, *verbose)
+		runStatus(*dbURL, *migrationsDir, *verbose)
 	case "version":
-		runVersion(ctx, *dbURL, *migrationsDir)
+		runVersion(*dbURL, *migrationsDir)
 	case "create":
 		if len(flag.Args()) == 0 {
 			fmt.Fprintf(os.Stderr, "Error: migration name is required\n")
@@ -60,7 +78,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: migration version is required\n")
 			os.Exit(1)
 		}
-		runForce(ctx, *dbURL, flag.Args()[0], *verbose)
+		runForce(*dbURL, flag.Args()[0], *verbose)
 	case "validate":
 		runValidate(*migrationsDir)
 	default:
@@ -71,7 +89,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println("Potter Migration Tool")
+	fmt.Println("Potter Migration Tool (powered by goose)")
 	fmt.Println()
 	fmt.Println("Usage: potter-migrate <command> [flags]")
 	fmt.Println()
@@ -85,87 +103,148 @@ func printUsage() {
 	fmt.Println("  validate      - Validate migration files")
 	fmt.Println()
 	fmt.Println("Flags:")
-	fmt.Println("  --database-url    - Database connection string (required)")
+	fmt.Println("  --database-url    - Database connection string (required for most commands)")
 	fmt.Println("  --migrations-dir   - Path to migrations directory (default: ./migrations)")
+	fmt.Println("  --dialect          - Database dialect (postgres, mysql, sqlite3). Auto-detected from URL")
 	fmt.Println("  --verbose          - Verbose output")
-	fmt.Println("  --dry-run          - Show SQL without executing")
+	fmt.Println("  --dry-run          - Show what would be done without executing")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  potter-migrate up --database-url postgres://user:pass@localhost/dbname")
+	fmt.Println("  potter-migrate down 1 --database-url postgres://user:pass@localhost/dbname")
+	fmt.Println("  potter-migrate status --database-url postgres://user:pass@localhost/dbname")
+	fmt.Println("  potter-migrate create add_user_roles --migrations-dir ./migrations")
 }
 
-func runUp(ctx context.Context, dbURL, migrationsDir string, verbose, dryRun bool) {
-	db, err := createMigrationDB(dbURL)
+func detectDialect(dbURL string) string {
+	if strings.HasPrefix(dbURL, "postgres://") || strings.HasPrefix(dbURL, "postgresql://") {
+		return "postgres"
+	}
+	if strings.HasPrefix(dbURL, "mysql://") {
+		return "mysql"
+	}
+	if strings.HasPrefix(dbURL, "sqlite3://") || strings.HasPrefix(dbURL, "sqlite://") {
+		return "sqlite3"
+	}
+	// По умолчанию PostgreSQL
+	return "postgres"
+}
+
+func openDB(dbURL string) (*sql.DB, error) {
+	// Определяем драйвер из URL
+	var driver string
+	if strings.HasPrefix(dbURL, "postgres://") || strings.HasPrefix(dbURL, "postgresql://") {
+		driver = "pgx"
+	} else if strings.HasPrefix(dbURL, "mysql://") {
+		driver = "mysql"
+		// Убираем префикс mysql:// для драйвера
+		dbURL = strings.TrimPrefix(dbURL, "mysql://")
+	} else if strings.HasPrefix(dbURL, "sqlite3://") {
+		driver = "sqlite3"
+		dbURL = strings.TrimPrefix(dbURL, "sqlite3://")
+	} else if strings.HasPrefix(dbURL, "sqlite://") {
+		driver = "sqlite3"
+		dbURL = strings.TrimPrefix(dbURL, "sqlite://")
+	} else {
+		// По умолчанию PostgreSQL
+		driver = "pgx"
+	}
+
+	db, err := sql.Open(driver, dbURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	return db, nil
+}
+
+func runUp(dbURL, migrationsDir string, steps int64, verbose, dryRun bool) {
+	db, err := openDB(dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer closeDB(db)
-
-	migrator := migrations.NewMigrator(db)
-	if err := migrator.RegisterFromFiles(migrationsDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading migrations: %v\n", err)
-		os.Exit(1)
-	}
+	defer db.Close()
 
 	if dryRun {
 		fmt.Println("Dry run mode - migrations would be applied:")
-		statuses, _ := migrator.Status(ctx)
+		statuses, err := migrations.GetMigrationStatus(db, migrationsDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting status: %v\n", err)
+			os.Exit(1)
+		}
+		pendingCount := 0
 		for _, status := range statuses {
 			if status.Status == "pending" {
-				fmt.Printf("  [PENDING] %s - %s\n", status.Version, status.Name)
+				if steps == 0 || int64(pendingCount) < steps {
+					fmt.Printf("  [PENDING] %d - %s\n", status.Version, status.Name)
+					pendingCount++
+				}
 			}
+		}
+		if steps > 0 && int64(pendingCount) > steps {
+			fmt.Printf("  ... and %d more migration(s) would be skipped\n", int64(pendingCount)-steps)
 		}
 		return
 	}
 
-	if err := migrator.Up(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "Error applying migrations: %v\n", err)
-		os.Exit(1)
+	if steps > 0 {
+		fmt.Printf("Applying %d migration(s)...\n", steps)
+		if err := migrations.RunMigrationsLimited(db, migrationsDir, steps); err != nil {
+			fmt.Fprintf(os.Stderr, "Error applying migrations: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Applied %d migration(s) successfully\n", steps)
+	} else {
+		if err := migrations.RunMigrations(db, migrationsDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error applying migrations: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Migrations applied successfully")
 	}
-
-	fmt.Println("Migrations applied successfully")
 }
 
-func runDown(ctx context.Context, dbURL, migrationsDir string, steps int, verbose, dryRun bool) {
-	db, err := createMigrationDB(dbURL)
+func runDown(dbURL, migrationsDir string, steps int64, verbose, dryRun bool) {
+	db, err := openDB(dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer closeDB(db)
-
-	migrator := migrations.NewMigrator(db)
-	if err := migrator.RegisterFromFiles(migrationsDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading migrations: %v\n", err)
-		os.Exit(1)
-	}
+	defer db.Close()
 
 	if dryRun {
 		fmt.Printf("Dry run mode - would rollback %d migration(s)\n", steps)
 		return
 	}
 
-	if err := migrator.Down(ctx, steps); err != nil {
-		fmt.Fprintf(os.Stderr, "Error rolling back migrations: %v\n", err)
-		os.Exit(1)
+	if steps == 1 {
+		if err := migrations.RollbackMigration(db, migrationsDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error rolling back migration: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		if err := migrations.RollbackMigrations(db, migrationsDir, steps); err != nil {
+			fmt.Fprintf(os.Stderr, "Error rolling back migrations: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Printf("Rolled back %d migration(s)\n", steps)
 }
 
-func runStatus(ctx context.Context, dbURL, migrationsDir string, verbose bool) {
-	db, err := createMigrationDB(dbURL)
+func runStatus(dbURL, migrationsDir string, verbose bool) {
+	db, err := openDB(dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer closeDB(db)
+	defer db.Close()
 
-	migrator := migrations.NewMigrator(db)
-	if err := migrator.RegisterFromFiles(migrationsDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading migrations: %v\n", err)
-		os.Exit(1)
-	}
-
-	statuses, err := migrator.Status(ctx)
+	statuses, err := migrations.GetMigrationStatus(db, migrationsDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting status: %v\n", err)
 		os.Exit(1)
@@ -177,11 +256,9 @@ func runStatus(ctx context.Context, dbURL, migrationsDir string, verbose bool) {
 		statusIcon := "⏳"
 		if status.Status == "applied" {
 			statusIcon = "✅"
-		} else if status.Status == "failed" {
-			statusIcon = "❌"
 		}
 
-		fmt.Printf("%s %s - %s", statusIcon, status.Version, status.Name)
+		fmt.Printf("%s %d - %s", statusIcon, status.Version, status.Name)
 		if status.AppliedAt != nil {
 			fmt.Printf(" (applied at %s)", status.AppliedAt.Format("2006-01-02 15:04:05"))
 		}
@@ -189,27 +266,21 @@ func runStatus(ctx context.Context, dbURL, migrationsDir string, verbose bool) {
 	}
 }
 
-func runVersion(ctx context.Context, dbURL, migrationsDir string) {
-	db, err := createMigrationDB(dbURL)
+func runVersion(dbURL, migrationsDir string) {
+	db, err := openDB(dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer closeDB(db)
+	defer db.Close()
 
-	migrator := migrations.NewMigrator(db)
-	if err := migrator.RegisterFromFiles(migrationsDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading migrations: %v\n", err)
-		os.Exit(1)
-	}
-
-	version, err := migrator.Version(ctx)
+	version, err := migrations.GetCurrentVersion(db)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting version: %v\n", err)
 		os.Exit(1)
 	}
 
-	if version == "" {
+	if version == 0 {
 		fmt.Println("No migrations applied")
 	} else {
 		fmt.Println(version)
@@ -217,62 +288,72 @@ func runVersion(ctx context.Context, dbURL, migrationsDir string) {
 }
 
 func runCreate(migrationsDir, name string) {
-	// Генерируем версию на основе timestamp
-	timestamp := fmt.Sprintf("%d", os.Getpid()) // Упрощенная версия, в реальности использовать time.Now().Unix()
-
-	upFile := fmt.Sprintf("%s/%s_%s.up.sql", migrationsDir, timestamp, name)
-	downFile := fmt.Sprintf("%s/%s_%s.down.sql", migrationsDir, timestamp, name)
-
-	// Создаем директорию если не существует
-	if err := os.MkdirAll(migrationsDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating migrations directory: %v\n", err)
+	if err := migrations.CreateMigration(migrationsDir, name); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating migration: %v\n", err)
 		os.Exit(1)
 	}
-
-	// Создаем файлы
-	if err := os.WriteFile(upFile, []byte("-- Migration: "+name+"\n"), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating up migration: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := os.WriteFile(downFile, []byte("-- Rollback: "+name+"\n"), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating down migration: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Created migration: %s\n", name)
-	fmt.Printf("  Up:   %s\n", upFile)
-	fmt.Printf("  Down: %s\n", downFile)
 }
 
-func runForce(ctx context.Context, dbURL, version string, verbose bool) {
-	fmt.Fprintf(os.Stderr, "Force command not fully implemented\n")
-	os.Exit(1)
+func runForce(dbURL, version string, verbose bool) {
+	db, err := openDB(dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// Конвертируем строковую версию в int64
+	versionInt, err := strconv.ParseInt(version, 10, 64)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: invalid version '%s', must be a number: %v\n", version, err)
+		os.Exit(1)
+	}
+
+	// Получаем текущую версию для подтверждения
+	currentVersion, err := migrations.GetCurrentVersion(db)
+	if err != nil {
+		// Если таблица не существует, это нормально - мы создадим её
+		currentVersion = 0
+	}
+
+	// Устанавливаем версию
+	if err := migrations.SetVersion(db, versionInt); err != nil {
+		fmt.Fprintf(os.Stderr, "Error setting version: %v\n", err)
+		os.Exit(1)
+	}
+
+	if verbose {
+		fmt.Printf("Current version was: %d\n", currentVersion)
+	}
+	fmt.Printf("Version set to: %d\n", versionInt)
+	fmt.Println("WARNING: This command does not execute migration SQL. Use with caution!")
 }
 
 func runValidate(migrationsDir string) {
-	source := migrations.NewFileMigrationSource(migrationsDir)
-	_, err := source.LoadMigrations()
+	// Проверяем что директория существует
+	if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Validation failed: migrations directory does not exist: %s\n", migrationsDir)
+		os.Exit(1)
+	}
+
+	// Проверяем что есть файлы миграций
+	files, err := os.ReadDir(migrationsDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Validation failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("All migrations are valid")
-}
-
-func createMigrationDB(dbURL string) (migrations.MigrationDB, error) {
-	if strings.HasPrefix(dbURL, "postgres://") || strings.HasPrefix(dbURL, "postgresql://") {
-		return migrations.NewPostgresMigrationDB(dbURL)
-	} else if strings.HasPrefix(dbURL, "mongodb://") {
-		// MongoDB миграции временно не поддерживаются
-		// Полная реализация требует поддержки JavaScript миграций и более сложной инфраструктуры
-		return nil, fmt.Errorf("MongoDB migrations are not yet fully implemented. Please use PostgreSQL for migrations or implement MongoDB migration support")
+	migrationFiles := 0
+	for _, file := range files {
+		if !file.IsDir() && (strings.HasSuffix(file.Name(), ".sql") || strings.HasSuffix(file.Name(), ".go")) {
+			migrationFiles++
+		}
 	}
-	return nil, fmt.Errorf("unsupported database URL scheme: %s (supported: postgres://, postgresql://)", dbURL)
-}
 
-func closeDB(db migrations.MigrationDB) {
-	// Закрываем соединение если необходимо
-	// В текущей реализации это не требуется, но может быть добавлено в будущем
+	if migrationFiles == 0 {
+		fmt.Fprintf(os.Stderr, "Validation failed: no migration files found in %s\n", migrationsDir)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Validation passed: found %d migration file(s)\n", migrationFiles)
 }

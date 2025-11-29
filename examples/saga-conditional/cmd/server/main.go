@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,8 +14,9 @@ import (
 	"github.com/google/uuid"
 	"potter/examples/saga-conditional/application"
 	"potter/examples/saga-conditional/infrastructure"
-	"potter/framework/adapters/events"
+	adapterevents "potter/framework/adapters/events"
 	"potter/framework/adapters/messagebus"
+	"potter/framework/events"
 	"potter/framework/invoke"
 	"potter/framework/saga"
 )
@@ -73,11 +73,11 @@ func main() {
 	}
 	defer natsAdapter.Stop(ctx)
 
-	eventConfig := events.NATSEventConfig{
+	eventConfig := adapterevents.NATSEventConfig{
 		Conn:          natsAdapter.Conn(),
 		SubjectPrefix: "events",
 	}
-	eventPublisher, err := events.NewNATSEventAdapter(eventConfig)
+	eventPublisher, err := adapterevents.NewNATSEventAdapter(eventConfig)
 	if err != nil {
 		log.Fatalf("Failed to create event publisher: %v", err)
 	}
@@ -87,8 +87,10 @@ func main() {
 	}
 	defer eventPublisher.Stop(ctx)
 
+	eventBus := events.NewInMemoryEventBus()
+
 	asyncCommandBus := invoke.NewAsyncCommandBus(natsAdapter)
-	eventAwaiter := invoke.NewEventAwaiterFromEventBus(eventPublisher)
+	eventAwaiter := invoke.NewEventAwaiterFromEventBus(eventBus)
 
 	registry := saga.NewSagaRegistry()
 	conditionalSagaDef := application.NewConditionalSagaDefinition(asyncCommandBus, eventAwaiter)
@@ -101,7 +103,7 @@ func main() {
 		eventStorePersistence.WithRegistry(registry)
 	}
 
-	orchestrator := saga.NewDefaultOrchestrator(sagaPersistence, eventPublisher)
+	orchestrator := saga.NewDefaultOrchestrator(sagaPersistence, eventBus)
 	orchestrator.WithRegistry(registry)
 
 	router := gin.Default()

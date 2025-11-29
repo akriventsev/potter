@@ -47,6 +47,130 @@ make up    # Запустить MongoDB
 make run   # Запустить приложение
 ```
 
+## Миграции для MongoDB
+
+Для MongoDB рекомендуется использовать Go-миграции вместо SQL, так как MongoDB не поддерживает SQL напрямую. Пример Go-миграции для создания коллекций и индексов:
+
+```go
+package migrations
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/pressly/goose/v3"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+var mongoClient *mongo.Client
+
+func init() {
+	goose.AddMigration(upInitCollections, downInitCollections)
+}
+
+func upInitCollections(tx *sql.Tx) error {
+	// В реальном приложении используйте dependency injection для получения MongoDB клиента
+	ctx := context.Background()
+	
+	// Получаем MongoDB клиент (в реальном приложении это должно быть через DI)
+	client := getMongoClient()
+	if client == nil {
+		return fmt.Errorf("MongoDB client not initialized")
+	}
+	
+	db := client.Database("potter")
+	
+	// Создаем коллекцию event_store
+	if err := db.CreateCollection(ctx, "event_store"); err != nil {
+		// Игнорируем ошибку если коллекция уже существует
+		if !isCollectionExistsError(err) {
+			return err
+		}
+	}
+	
+	// Создаем индексы для event_store
+	eventStoreCollection := db.Collection("event_store")
+	indexes := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "aggregate_id", Value: 1}, {Key: "version", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{Key: "aggregate_id", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "event_type", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "occurred_at", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "position", Value: 1}},
+		},
+	}
+	
+	_, err := eventStoreCollection.Indexes().CreateMany(ctx, indexes)
+	if err != nil {
+		return err
+	}
+	
+	// Создаем коллекцию snapshots
+	if err := db.CreateCollection(ctx, "snapshots"); err != nil {
+		if !isCollectionExistsError(err) {
+			return err
+		}
+	}
+	
+	// Создаем индекс для snapshots
+	snapshotsCollection := db.Collection("snapshots")
+	snapshotIndexes := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "aggregate_id", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+	}
+	
+	_, err = snapshotsCollection.Indexes().CreateMany(ctx, snapshotIndexes)
+	return err
+}
+
+func downInitCollections(tx *sql.Tx) error {
+	client := getMongoClient()
+	if client == nil {
+		return fmt.Errorf("MongoDB client not initialized")
+	}
+	
+	ctx := context.Background()
+	db := client.Database("potter")
+	
+	// Удаляем коллекции
+	if err := db.Collection("event_store").Drop(ctx); err != nil {
+		return err
+	}
+	
+	if err := db.Collection("snapshots").Drop(ctx); err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+func getMongoClient() *mongo.Client {
+	// В реальном приложении это должно быть через dependency injection
+	return mongoClient
+}
+
+func isCollectionExistsError(err error) bool {
+	// Проверяем, является ли ошибка ошибкой существования коллекции
+	return err != nil && (err.Error() == "collection already exists" || 
+		err.Error() == "namespace already exists")
+}
+```
+
+Подробнее о Go-миграциях для MongoDB см. [framework/migrations/README.md](../../../framework/migrations/README.md) и [документацию goose](https://github.com/pressly/goose).
+
 ## API Examples
 
 ### Добавление товара на склад

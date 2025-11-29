@@ -5,6 +5,43 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и этот проект придерживается [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [1.5.0] - 2025-XX-XX
+
+### Changed
+
+- **BREAKING**: Заменена самописная система миграций на интеграцию с goose
+- Формат файлов миграций изменен на goose формат (единый файл с аннотациями `-- +goose Up/Down`)
+- CLI инструмент `potter-migrate` переписан на использование goose
+- Все примеры обновлены для использования goose
+
+### Added
+
+- Интеграция с goose v3 для управления миграциями
+- Обертка `framework/migrations/goose_wrapper.go` для программного использования
+- Поддержка Go-миграций для MongoDB
+- Поддержка out-of-order миграций
+- Поддержка environment variable substitution в миграциях
+- Документация по миграции с Potter v1.3.x
+- Скрипты для автоматической конвертации старых миграций
+
+### Removed
+
+- Удалены файлы самописной системы миграций (~1000 строк кода):
+  - `framework/migrations/migrator.go`
+  - `framework/migrations/file_source.go`
+  - `framework/migrations/postgres_adapter.go`
+  - `framework/migrations/mongodb_adapter.go`
+  - `framework/migrations/migrator_test.go`
+
+### Migration Guide
+
+Для миграции существующих проектов:
+
+1. Установите goose: `go install github.com/pressly/goose/v3/cmd/goose@latest`
+2. Конвертируйте миграции: объедините `.up.sql` и `.down.sql` файлы в один с аннотациями
+3. Обновите скрипты сборки для использования goose вместо potter-migrate
+4. См. полную документацию в `framework/migrations/README.md` и `framework/migrations/MIGRATION_GUIDE.md`
+
 ## [1.3.1] - 2025-XX-XX
 
 ### Removed

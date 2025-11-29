@@ -18,9 +18,29 @@ docker-down:
 	@docker-compose down
 
 # Применение миграций
-migrate:
+migrate: migrate-up ## Алиас для migrate-up
+
+migrate-up: ## Применить миграции
 	@echo "Running migrations..."
-	@PGPASSWORD=postgres psql -h localhost -U postgres -d potter -f migrations/001_create_event_store.sql || true
+	@which goose > /dev/null || (echo "goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest" && exit 1)
+	@goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/potter?sslmode=disable" up
+
+migrate-down: ## Откатить миграции
+	@echo "Rolling back migrations..."
+	@which goose > /dev/null || (echo "goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest" && exit 1)
+	@goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/potter?sslmode=disable" down
+
+migrate-status: ## Показать статус миграций
+	@which goose > /dev/null || (echo "goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest" && exit 1)
+	@goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/potter?sslmode=disable" status
+
+migrate-create: ## Создать новую миграцию (использование: make migrate-create NAME=migration_name)
+	@if [ -z "$(NAME)" ]; then \
+		echo "Error: NAME is required. Usage: make migrate-create NAME=migration_name"; \
+		exit 1; \
+	fi
+	@which goose > /dev/null || (echo "goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest" && exit 1)
+	@goose -dir migrations create $(NAME) sql
 
 # Тестирование
 test:

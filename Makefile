@@ -67,8 +67,14 @@ install-potter-migrate:
 	@go install ./cmd/potter-migrate
 	@echo "potter-migrate installed successfully"
 
+# Установка goose CLI
+install-goose: ## Установить goose CLI
+	@echo "Installing goose..."
+	@go install github.com/pressly/goose/v3/cmd/goose@latest
+	@echo "Goose installed successfully"
+
 # Установка всех инструментов кодогенерации
-install-codegen-tools: install-potter-gen install-protoc-gen-potter install-potter-migrate
+install-codegen-tools: install-potter-gen install-protoc-gen-potter install-potter-migrate install-goose
 	@echo "All codegen tools installed"
 
 # Тестирование кодогенератора
@@ -155,8 +161,9 @@ help:
 	@echo "  make example-eventsourcing-migrate - Run Event Sourcing migrations"
 	@echo "  make test-eventsourcing      - Run Event Sourcing tests"
 	@echo "  make benchmark-eventsourcing - Run Event Sourcing benchmarks"
-	@echo "  make install-codegen-tools   - Install potter-gen, protoc-gen-potter and potter-migrate"
+	@echo "  make install-codegen-tools   - Install potter-gen, protoc-gen-potter, potter-migrate and goose"
 	@echo "  make install-potter-migrate   - Install potter-migrate CLI"
+	@echo "  make install-goose            - Install goose CLI"
 	@echo "  make test-codegen            - Test code generator"
 	@echo "  make example-codegen         - Run codegen example"
 	@echo "  make clean-codegen           - Clean generated code"

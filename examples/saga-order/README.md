@@ -82,8 +82,8 @@ sequenceDiagram
 ### Предварительные требования
 
 - Docker и Docker Compose
-- Go 1.21+
-- PostgreSQL клиент (для миграций)
+- Go 1.25.0+
+- goose CLI (для миграций): `go install github.com/pressly/goose/v3/cmd/goose@latest`
 
 ### Запуск
 
@@ -239,6 +239,47 @@ make test-int
 - `step.completed` - количество завершенных шагов
 - `step.failed` - количество неудачных шагов
 
+## Миграции
+
+Этот пример использует [goose](https://github.com/pressly/goose) для управления миграциями базы данных.
+
+### Установка goose
+
+```bash
+go install github.com/pressly/goose/v3/cmd/goose@latest
+```
+
+### Команды миграций
+
+```bash
+# Применить все pending миграции
+make migrate-up
+
+# Откатить последнюю миграцию
+make migrate-down
+
+# Показать статус миграций
+make migrate-status
+
+# Создать новую миграцию
+make migrate-create NAME=add_new_table
+```
+
+### Использование goose напрямую
+
+```bash
+# Применить миграции
+goose -dir migrations postgres "postgres://user:pass@localhost:5432/saga_order?sslmode=disable" up
+
+# Откатить миграции
+goose -dir migrations postgres "postgres://user:pass@localhost:5432/saga_order?sslmode=disable" down
+
+# Показать статус
+goose -dir migrations postgres "postgres://user:pass@localhost:5432/saga_order?sslmode=disable" status
+```
+
+Подробнее о goose см. [документацию goose](https://github.com/pressly/goose) и [framework/migrations/README.md](../../../framework/migrations/README.md).
+
 ## Структура проекта
 
 ```
@@ -256,7 +297,7 @@ examples/saga-order/
 ├── infrastructure/
 │   └── persistence.go          # Persistence для саг
 ├── migrations/
-│   └── 001_create_saga_tables.sql
+│   └── 001_create_saga_tables.sql  # Миграции в формате goose
 ├── docker-compose.yml          # Docker Compose конфигурация
 ├── Makefile                    # Make команды
 ├── api_examples.http           # Примеры API запросов
@@ -322,6 +363,7 @@ examples/saga-order/
 - Проверьте подключение к NATS: `docker-compose logs nats`
 - Проверьте подключение к PostgreSQL: `docker-compose logs postgres`
 - Убедитесь, что миграции применены: `make migrate-up`
+- Убедитесь, что goose установлен: `which goose` или установите через `go install github.com/pressly/goose/v3/cmd/goose@latest`
 
 ### Проблема: Saga застревает в статусе "running"
 

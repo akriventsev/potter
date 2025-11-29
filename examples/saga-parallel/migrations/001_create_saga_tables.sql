@@ -1,3 +1,4 @@
+-- +goose Up
 -- Миграция для создания таблиц Saga Pattern в PostgreSQL
 
 CREATE TABLE IF NOT EXISTS saga_instances (
@@ -27,4 +28,8 @@ CREATE TABLE IF NOT EXISTS saga_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_saga ON saga_history(saga_id);
+
+-- +goose Down
+DROP TABLE IF EXISTS saga_history CASCADE;
+DROP TABLE IF EXISTS saga_instances CASCADE;
 

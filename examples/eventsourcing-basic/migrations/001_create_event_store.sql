@@ -1,3 +1,4 @@
+-- +goose Up
 -- Создание таблицы для Event Store
 CREATE SCHEMA IF NOT EXISTS public;
 
@@ -32,4 +33,8 @@ CREATE TABLE IF NOT EXISTS public.snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_snapshots_aggregate_id ON public.snapshots(aggregate_id);
+
+-- +goose Down
+DROP TABLE IF EXISTS public.snapshots CASCADE;
+DROP TABLE IF EXISTS public.event_store CASCADE;
 

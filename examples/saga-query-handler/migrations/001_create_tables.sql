@@ -1,3 +1,4 @@
+-- +goose Up
 -- Миграции для EventStore и Saga
 CREATE SCHEMA IF NOT EXISTS public;
 
@@ -129,4 +130,15 @@ CREATE TABLE IF NOT EXISTS saga_step_read_models (
 
 CREATE INDEX IF NOT EXISTS idx_saga_step_rm_saga_id ON saga_step_read_models(saga_id);
 CREATE INDEX IF NOT EXISTS idx_saga_step_rm_status ON saga_step_read_models(status);
+
+-- +goose Down
+DROP TABLE IF EXISTS saga_step_read_models CASCADE;
+DROP TABLE IF EXISTS saga_read_models CASCADE;
+DROP TRIGGER IF EXISTS trigger_update_saga_updated_at ON saga_instances;
+DROP FUNCTION IF EXISTS update_saga_updated_at() CASCADE;
+DROP TABLE IF EXISTS saga_history CASCADE;
+DROP TABLE IF EXISTS saga_instances CASCADE;
+DROP TABLE IF EXISTS projection_checkpoints CASCADE;
+DROP TABLE IF EXISTS snapshots CASCADE;
+DROP TABLE IF EXISTS event_store CASCADE;
 

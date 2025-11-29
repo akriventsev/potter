@@ -2,6 +2,14 @@
 
 Этот каталог содержит примеры использования различных паттернов и компонентов фреймворка Potter.
 
+## Предварительные требования
+
+- Docker и Docker Compose
+- Go 1.25.0+
+- goose CLI (для миграций): `go install github.com/pressly/goose/v3/cmd/goose@latest`
+
+Подробнее о миграциях см. [framework/migrations/README.md](../../framework/migrations/README.md).
+
 ## Saga Pattern Examples
 
 ### saga-order

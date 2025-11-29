@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"potter/examples/eventsourcing-replay/application"
 	"potter/examples/eventsourcing-replay/infrastructure"
 	"potter/examples/eventsourcing-replay/projections"
 	"potter/framework/eventsourcing"
@@ -16,13 +15,11 @@ import (
 
 func main() {
 	var (
-		dsn          = flag.String("dsn", "postgres://postgres:postgres@localhost:5432/eventsourcing_replay?sslmode=disable", "Database connection string")
-		command      = flag.String("command", "", "Command: replay-all, replay-aggregate, replay-projection, replay-from")
-		aggregateID  = flag.String("aggregate-id", "", "Aggregate ID for replay-aggregate")
-		projection   = flag.String("projection", "", "Projection name for replay-projection")
-		fromTime     = flag.String("from-time", "", "Start time for replay-from (RFC3339 format)")
-		batchSize    = flag.Int("batch-size", 1000, "Batch size for replay")
-		parallel     = flag.Bool("parallel", false, "Enable parallel processing")
+		dsn         = flag.String("dsn", "postgres://postgres:postgres@localhost:5432/eventsourcing_replay?sslmode=disable", "Database connection string")
+		command     = flag.String("command", "", "Command: replay-all, replay-aggregate, replay-projection, replay-from")
+		aggregateID = flag.String("aggregate-id", "", "Aggregate ID for replay-aggregate")
+		projection  = flag.String("projection", "", "Projection name for replay-projection")
+		fromTime    = flag.String("from-time", "", "Start time for replay-from (RFC3339 format)")
 	)
 	flag.Parse()
 
@@ -53,7 +50,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create event store: %v", err)
 	}
-	defer eventStore.Stop(ctx)
 
 	// Создаем checkpoint store
 	checkpointStore, err := eventsourcing.NewPostgresCheckpointStore(*dsn)
@@ -162,4 +158,3 @@ func main() {
 		log.Fatalf("Unknown command: %s", *command)
 	}
 }
-

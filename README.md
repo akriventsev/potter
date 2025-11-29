@@ -93,7 +93,7 @@ make test-unit
 
 ### Предварительные требования
 
-- Go 1.21 или выше
+- Go 1.25.0 или выше
 - Protocol Buffers compiler (protoc)
 - (Опционально) NATS Server для использования Message Queue
 

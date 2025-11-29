@@ -29,15 +29,29 @@ docker-down: ## Остановить Docker Compose сервисы
 
 migrate-up: ## Применить миграции
 	@echo "$(GREEN)Применение миграций...$(NC)"
-	@PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -f migrations/001_create_saga_tables.sql || echo "$(YELLOW)Warning: psql not available, migrations will be applied programmatically$(NC)"
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations postgres "postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable" up
 	@echo "$(GREEN)Миграции применены$(NC)"
 
 migrate: migrate-up ## Алиас для migrate-up
 
-migrate-down: ## Откатить миграции (удалить таблицы)
+migrate-down: ## Откатить миграции
 	@echo "$(YELLOW)Откат миграций...$(NC)"
-	@PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -c "DROP TABLE IF EXISTS saga_history CASCADE; DROP TABLE IF EXISTS saga_instances CASCADE;"
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations postgres "postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable" down
 	@echo "$(GREEN)Миграции откачены$(NC)"
+
+migrate-status: ## Показать статус миграций
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations postgres "postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable" status
+
+migrate-create: ## Создать новую миграцию (использование: make migrate-create NAME=migration_name)
+	@if [ -z "$(NAME)" ]; then \
+		echo "$(YELLOW)Error: NAME is required. Usage: make migrate-create NAME=migration_name$(NC)"; \
+		exit 1; \
+	fi
+	@which goose > /dev/null || (echo "$(YELLOW)goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest$(NC)" && exit 1)
+	@goose -dir migrations create $(NAME) sql
 
 run: ## Запустить сервер
 	@echo "$(GREEN)Запуск saga-order сервера...$(NC)"

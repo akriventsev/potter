@@ -568,28 +568,45 @@ for change := range changes {
 Версионированные миграции схемы базы данных с rollback поддержкой.
 
 **Возможности:**
-- 📝 **File-based Migrations** - миграции из SQL файлов (PostgreSQL)
+- 📝 **SQL и Go миграции** - поддержка SQL миграций для PostgreSQL, MySQL, SQLite и Go миграций для MongoDB
 - 🔄 **Up/Down Support** - полная поддержка rollback
 - 🔒 **Concurrent Safety** - блокировки для предотвращения concurrent migrations
-- ✅ **Checksum Validation** - обнаружение изменений в примененных миграциях
-- 🛠️ **CLI Tool** - potter-migrate для управления миграциями
+- ✅ **Out-of-order миграции** - поддержка применения миграций вне порядка
+- 🌍 **Environment Variable Substitution** - подстановка переменных окружения в миграциях
+- 🛠️ **CLI Tool** - potter-migrate (обертка над goose) и прямой доступ к goose CLI
+- 📚 **Индустриальный стандарт** - основано на [goose](https://github.com/pressly/goose)
 
-**Примечание:** MongoDB миграции временно не поддерживаются в potter-migrate CLI. Базовая инфраструктура для MongoDB существует, но требует дополнительной реализации для поддержки JavaScript миграций.
-
-**Пример использования:**
+**Пример использования CLI:**
 ```bash
+# Через potter-migrate
 potter-migrate up --database-url postgres://localhost/db
 potter-migrate down 1 --database-url postgres://localhost/db
 potter-migrate status --database-url postgres://localhost/db
 potter-migrate create add_user_roles
+
+# Или напрямую через goose
+goose -dir migrations postgres "postgres://localhost/db" up
+goose -dir migrations postgres "postgres://localhost/db" down
+goose -dir migrations postgres "postgres://localhost/db" status
+goose -dir migrations create add_user_roles sql
 ```
 
 **Программное использование:**
 ```go
-migrator := migrations.NewMigrator(migrations.NewPostgresMigrationDB(dsn))
-migrator.RegisterFromFiles("migrations")
-err := migrator.Up(ctx)
+import (
+    "database/sql"
+    "potter/framework/migrations"
+    _ "github.com/jackc/pgx/v5/stdlib"
+)
+
+db, _ := sql.Open("pgx", dsn)
+err := migrations.RunMigrations(db, "./migrations")
+
+// Получить статус
+statuses, _ := migrations.GetMigrationStatus(db, "./migrations")
 ```
+
+**Подробная документация:** [framework/migrations/README.md](migrations/README.md)
 
 ### framework/saga
 
