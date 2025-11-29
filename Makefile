@@ -1,4 +1,4 @@
-.PHONY: test test-coverage test-unit test-integration lint clean deps example-warehouse example-warehouse-docker help example-eventsourcing-basic example-eventsourcing-docker example-eventsourcing-migrate test-eventsourcing benchmark-eventsourcing test-all example-saga-order example-saga-order-test example-saga-warehouse test-saga test-saga-integration benchmark-saga install-potter-migrate
+.PHONY: test test-coverage test-unit test-integration lint clean deps help example-eventsourcing-basic example-eventsourcing-docker example-eventsourcing-migrate test-eventsourcing benchmark-eventsourcing test-all example-saga-order example-saga-order-test test-saga test-saga-integration benchmark-saga install-potter-migrate
 
 # Тестирование
 test:
@@ -39,16 +39,6 @@ deps:
 	@go mod download
 	@go mod tidy
 
-# Запуск warehouse примера
-example-warehouse:
-	@echo "Running warehouse example..."
-	@cd examples/warehouse && make run
-
-# Запуск инфраструктуры для warehouse
-example-warehouse-docker:
-	@echo "Starting warehouse infrastructure..."
-	@cd examples/warehouse && make docker-up
-
 # Установка potter-gen CLI
 install-potter-gen:
 	@echo "Installing potter-gen..."
@@ -60,6 +50,17 @@ install-protoc-gen-potter:
 	@echo "Installing protoc-gen-potter..."
 	@go install ./cmd/protoc-gen-potter
 	@echo "protoc-gen-potter installed successfully"
+
+# Установка protoc плагинов (protoc-gen-go и protoc-gen-go-grpc)
+install-protoc-plugins:
+	@echo "Installing protoc-gen-go and protoc-gen-go-grpc..."
+	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+	@echo "protoc-gen-go and protoc-gen-go-grpc installed successfully"
+
+# Установка всех инструментов для работы с proto (protoc-gen-go, protoc-gen-go-grpc, protoc-gen-potter)
+install-tools: install-protoc-plugins install-protoc-gen-potter
+	@echo "All proto tools installed successfully"
 
 # Установка potter-migrate CLI
 install-potter-migrate:
@@ -127,10 +128,6 @@ example-saga-order-test:
 	@echo "Testing Order Saga example..."
 	@cd examples/saga-order && make test
 
-example-saga-warehouse:
-	@echo "Running Warehouse Saga integration example..."
-	@cd examples/saga-warehouse-integration && make docker-up && make migrate && make run
-
 test-saga:
 	@echo "Testing Saga module..."
 	@go test -v -race -coverprofile=coverage-saga.out ./framework/saga/...
@@ -154,13 +151,14 @@ help:
 	@echo "  make lint                    - Run linter"
 	@echo "  make clean                   - Clean build artifacts"
 	@echo "  make deps                    - Install dependencies"
-	@echo "  make example-warehouse      - Run warehouse example"
-	@echo "  make example-warehouse-docker - Start warehouse infrastructure"
 	@echo "  make example-eventsourcing-basic - Run Event Sourcing basic example"
 	@echo "  make example-eventsourcing-docker - Start Event Sourcing infrastructure"
 	@echo "  make example-eventsourcing-migrate - Run Event Sourcing migrations"
 	@echo "  make test-eventsourcing      - Run Event Sourcing tests"
 	@echo "  make benchmark-eventsourcing - Run Event Sourcing benchmarks"
+	@echo "  make install-tools            - Install protoc-gen-go, protoc-gen-go-grpc and protoc-gen-potter"
+	@echo "  make install-protoc-plugins   - Install protoc-gen-go and protoc-gen-go-grpc"
+	@echo "  make install-protoc-gen-potter - Install protoc-gen-potter plugin"
 	@echo "  make install-codegen-tools   - Install potter-gen, protoc-gen-potter, potter-migrate and goose"
 	@echo "  make install-potter-migrate   - Install potter-migrate CLI"
 	@echo "  make install-goose            - Install goose CLI"
@@ -169,7 +167,6 @@ help:
 	@echo "  make clean-codegen           - Clean generated code"
 	@echo "  make example-saga-order     - Run Order Saga example"
 	@echo "  make example-saga-order-test - Test Order Saga example"
-	@echo "  make example-saga-warehouse - Run Warehouse Saga integration example"
 	@echo "  make test-saga               - Test Saga module"
 	@echo "  make test-saga-integration   - Run Saga integration tests"
 	@echo "  make benchmark-saga          - Run Saga benchmarks"

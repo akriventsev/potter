@@ -31,24 +31,6 @@ make run
 
 **Документация:** [saga-order/README.md](saga-order/README.md)
 
-### saga-warehouse-integration
-
-Пример интеграции Saga с Two-Phase Commit (2PC) для координации распределенных транзакций между несколькими складами.
-
-**Ключевые особенности:**
-- Использование TwoPhaseCommitStep для координации нескольких участников
-- Резервирование товара на нескольких складах одновременно
-- Интеграция с warehouse сервисом через 2PC
-
-**Quick Start:**
-```bash
-cd examples/saga-warehouse-integration
-make up
-make run
-```
-
-**Документация:** [saga-warehouse-integration/README.md](saga-warehouse-integration/README.md)
-
 ### saga-parallel
 
 Пример демонстрации параллельного выполнения шагов в Saga.
@@ -166,31 +148,6 @@ make run
 
 **Документация:** [eventsourcing-mongodb/README.md](eventsourcing-mongodb/README.md)
 
-## Repository Examples
-
-### repository-query-builder
-
-Демонстрация Query Builder для Postgres и MongoDB репозиториев.
-
-**Ключевые особенности:**
-- Сложные запросы с фильтрацией, сортировкой, пагинацией
-- Joins между таблицами/коллекциями
-- Агрегация (Count, Sum, Avg, Min, Max)
-- Группировка с Having
-- Full-text search (MongoDB)
-- Geo queries (MongoDB)
-- Index management и performance optimization
-
-**Quick Start:**
-```bash
-cd examples/repository-query-builder
-make docker-up
-make migrate
-make run
-```
-
-**Документация:** [repository-query-builder/README.md](repository-query-builder/README.md)
-
 ## GraphQL Transport Example
 
 ### graphql-service
@@ -245,12 +202,11 @@ make run
 
 ### Saga Pattern
 
-| Пример | Базовые шаги | Параллельные шаги | Условные шаги | 2PC интеграция | Компенсация |
-|--------|-------------|-------------------|---------------|----------------|-------------|
-| saga-order | ✅ | ❌ | ❌ | ❌ | ✅ |
-| saga-warehouse-integration | ✅ | ❌ | ❌ | ✅ | ✅ |
-| saga-parallel | ✅ | ✅ | ❌ | ❌ | ✅ |
-| saga-conditional | ✅ | ❌ | ✅ | ❌ | ✅ |
+| Пример | Базовые шаги | Параллельные шаги | Условные шаги | Компенсация |
+|--------|-------------|-------------------|---------------|-------------|
+| saga-order | ✅ | ❌ | ❌ | ✅ |
+| saga-parallel | ✅ | ✅ | ❌ | ✅ |
+| saga-conditional | ✅ | ❌ | ✅ | ✅ |
 
 ### Event Sourcing
 

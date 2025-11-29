@@ -2,8 +2,8 @@
 
 План развития Potter Framework.
 
-> **Текущая версия:** 1.3.1  
-> **Следующий релиз:** 1.4.0 (все функции реализованы, ожидается публикация)
+> **Текущая версия:** 1.5.0  
+> **Следующий релиз:** 1.6.0 (планируется)
 
 ## Версия 1.0.0 ✅
 
@@ -60,7 +60,6 @@
 - [x] Timeout и cancellation support
 - [x] Comprehensive документация и примеры
 - [x] Order Saga example
-- [x] Warehouse 2PC integration example
 - [x] Полное покрытие unit и integration тестами
 
 ## Версия 1.4.0 ✅
@@ -89,17 +88,22 @@
 - ✅ Поддержка Go-миграций для MongoDB
 - ✅ Интеграция миграций с codegen
 
+## Версия 1.5.0 ✅
+
+### Migrations
+- ✅ Goose integration для версионированных миграций
+- ✅ CLI инструмент potter-migrate для управления миграциями
+- ✅ Программный API для запуска миграций
+
 ### Покрытие примерами (v1.4.0)
 
 ✅ **Saga Pattern** - полное покрытие всех типов шагов:
 
-  - Базовые шаги: `saga-order`, `saga-warehouse-integration`
+  - Базовые шаги: `saga-order`
 
   - Параллельные шаги: `saga-parallel`
 
   - Условные шаги: `saga-conditional`
-
-  - 2PC интеграция: `saga-warehouse-integration`
 
   - Query Handler с read models: `saga-query-handler`
 
@@ -117,12 +121,6 @@
 
   - Projections: все примеры используют projection framework
 
-
-
-✅ **Repository** - демонстрация Query Builder и индексов:
-
-  - `repository-query-builder` - сложные запросы, joins, агрегация, full-text search
-
 ## Planned (v1.2.x+)
 
 - ⏳ EventStoreDB Adapter (pending stable Go client v21.2+)
@@ -136,7 +134,7 @@
 - ✅ GraphQL subscriptions для real-time обновлений
 - ✅ Интеграция с существующими GraphQL серверами
 
-## Версия 1.4 (Планируется)
+## Версия 1.6.0 (Планируется)
 
 ### Автоматическая генерация OpenAPI спецификаций
 - [ ] Генерация OpenAPI 3.0 спецификаций из proto файлов
@@ -179,7 +177,7 @@
 
 ## Завершенные версии
 
-Все завершённые версии (v1.0.0 - v1.4.0) детально описаны в разделах выше. Основные достижения:
+Все завершённые версии (v1.0.0 - v1.5.0) детально описаны в разделах выше. Основные достижения:
 
 - **v1.0.0**: Базовая структура фреймворка, CQRS, Transport, Events, Container, Metrics, FSM
 - **v1.1.0**: Invoke Module, базовая поддержка Event Sourcing, OpenTelemetry метрики
@@ -187,10 +185,12 @@
 - **v1.3.0**: Полная реализация Event Sourcing с адаптерами, snapshots, replay
 - **v1.3.x**: Полная реализация Saga Pattern с FSM, компенсацией, интеграциями
 - **v1.4.0**: Repository enhancements, Saga Query Handler, Projection framework, Tooling
+- **v1.5.0**: Goose integration для версионированных миграций
 
 ## Приоритеты
 
-1. **Высокий приоритет**: GraphQL Transport, OpenAPI генерация
+1. **Высокий приоритет**: OpenAPI генерация
+   - GraphQL Transport реализован в v1.4.0
    - Event Sourcing и Saga Pattern полностью реализованы в v1.4.0
 2. **Средний приоритет**: Расширенный distributed tracing
 3. **Низкий приоритет**: WebAssembly, multi-tenancy, serverless support

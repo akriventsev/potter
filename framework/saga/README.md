@@ -381,29 +381,6 @@ curl http://localhost:8080/api/v1/sagas/{saga_id}
 curl http://localhost:8080/api/v1/sagas/{saga_id}/history
 ```
 
-### Warehouse 2PC Saga (`examples/saga-warehouse-integration/`)
-
-Пример интеграции Saga Pattern с 2PC координатором для атомарного резервирования на нескольких складах:
-
-- **Шаги**: ValidateOrder → TwoPhaseCommitStep (multi-warehouse reserve) → ProcessPayment
-- **2PC Integration**: Использует `twopc.NATSCoordinator` из `examples/warehouse/infrastructure/twopc`
-- **Multi-warehouse**: Атомарное резервирование на нескольких складах одновременно
-- **Compensation**: Автоматический abort 2PC при ошибках
-
-**Запуск:**
-```bash
-cd examples/saga-warehouse-integration
-make docker-up run
-```
-
-**API примеры:**
-```bash
-# Создание заказа с резервированием на нескольких складах
-curl -X POST http://localhost:8081/api/v1/warehouse-orders \
-  -H "Content-Type: application/json" \
-  -d '{"customer_id":"c1","warehouse_ids":["w1","w2"],"items":[{"product_id":"p1","quantity":10,"price":100}]}'
-```
-
 ### Архитектура Saga + FSM + EventStore
 
 ```mermaid

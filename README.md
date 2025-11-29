@@ -26,7 +26,14 @@
   - Интеграция с CQRS и EventBus
   - Persistence через EventStore и PostgreSQL
   - Retry механизм и timeout support
-  - Интеграция с 2PC для distributed transactions
+  - CQRS Query Handler с read models для мониторинга
+- 🔍 **Query Builder** - Fluent API для сложных запросов (Postgres, MongoDB)
+- 🗄️ **Schema Migrations** - Версионированные миграции через goose
+- 📊 **Projections Framework** - Централизованная инфраструктура для проекций с checkpoint management
+- 🎨 **GraphQL Transport** - Автогенерация схем из proto, queries/mutations/subscriptions
+- 📈 **Advanced Indexing** - Автоматическое управление индексами и рекомендации
+- 🔄 **Change Streams** - Реактивные обновления для MongoDB
+- ⏱️ **TTL Support** - Автоматическая очистка данных в MongoDB
 
 ## Транспорты
 
@@ -34,21 +41,27 @@
 - REST API (Gin)
 - gRPC
 - WebSocket
-- GraphQL (gqlgen)
-- Message Queue (NATS)
+- GraphQL (gqlgen) с автогенерацией схем из proto
+- Subscriptions для real-time обновлений
+- Message Queue (NATS, Kafka, Redis)
 
 ## Метрики
 
-Отдельный пакет `pkg/metrics` для сбора метрик через OpenTelemetry и Prometheus.
+Отдельный пакет `framework/metrics` для сбора метрик через OpenTelemetry и Prometheus.
 
 ## Production Readiness
 
 | Компонент | Статус | Описание |
 |-----------|--------|----------|
-| Event Sourcing (Postgres/MongoDB) | ✅ Production Ready | Полнофункциональные адаптеры с поддержкой снапшотов и replay |
-| Saga Pattern | ✅ Production Ready | Полная реализация с FSM, компенсацией и persistence |
+| Event Sourcing | ✅ Production Ready | Postgres/MongoDB адаптеры, snapshots, replay, projections |
+| Saga Pattern | ✅ Production Ready | FSM, компенсация, persistence, query handler с read models |
 | CQRS Invoke | ✅ Production Ready | Type-safe invokers для команд и запросов |
-| Code Generator | ⚠️ Beta | Стабильный API, активная разработка |
+| GraphQL Transport | ✅ Production Ready | Автогенерация схем, queries/mutations/subscriptions |
+| Query Builder | ✅ Production Ready | Fluent API для Postgres и MongoDB |
+| Schema Migrations | ✅ Production Ready | Goose integration, SQL и Go миграции |
+| Projections Framework | ✅ Production Ready | Checkpoint management, rebuild support |
+| Code Generator | ✅ Production Ready | Proto-first codegen с incremental updates |
+| EventStoreDB Adapter | ⏳ Pending | Структура готова, ожидает stable Go client v21.2+ |
 
 Подробнее о планах развития см. [ROADMAP.md](ROADMAP.md).
 
@@ -56,23 +69,42 @@
 
 ```
 .
-├── framework/           # Основной фреймворк
-│   ├── adapters/       # Built-in адаптеры (repository, messagebus, events, transport)
-│   ├── container/      # DI контейнер
-│   ├── core/           # Базовые интерфейсы и типы
-│   ├── cqrs/           # CQRS компоненты
-│   ├── events/         # Система событий
-│   ├── fsm/            # Конечный автомат для саг
-│   ├── invoke/         # Invoke module (type-safe CQRS invokers)
-│   │   └── examples/   # Практические примеры для всех транспортов
-│   ├── metrics/        # Метрики OpenTelemetry
-│   └── transport/      # Транспортный слой (CommandBus, QueryBus, MessageBus)
-├── examples/           # Примеры приложений
-│   └── warehouse/      # Warehouse example (2PC, Redis, PostgreSQL, NATS)
-└── api/                # API определения (proto)
+├── framework/              # Основной фреймворк
+│   ├── adapters/          # Built-in адаптеры
+│   │   ├── events/        # Event publishers (NATS, Kafka, MessageBus)
+│   │   ├── messagebus/    # Message bus адаптеры (NATS, Kafka, Redis)
+│   │   ├── repository/    # Репозитории (Postgres, MongoDB, InMemory)
+│   │   └── transport/     # Транспорты (REST, gRPC, WebSocket, GraphQL)
+│   ├── codegen/           # Code generator из proto файлов
+│   ├── container/         # DI контейнер
+│   ├── core/              # Базовые интерфейсы и типы
+│   ├── cqrs/              # CQRS компоненты
+│   ├── events/            # Система событий
+│   ├── eventsourcing/     # Event Sourcing (stores, snapshots, replay, projections)
+│   ├── fsm/               # Конечный автомат для саг
+│   ├── invoke/            # Type-safe CQRS invokers
+│   ├── metrics/           # Метрики OpenTelemetry
+│   ├── migrations/        # Goose wrapper для миграций
+│   ├── saga/              # Saga Pattern (orchestrator, query handler, read models)
+│   ├── testing/           # Testing utilities
+│   └── transport/         # Транспортный слой (CommandBus, QueryBus, MessageBus)
+├── examples/              # Примеры приложений
+│   ├── codegen/           # Пример кодогенерации
+│   ├── eventsourcing-basic/        # Базовый Event Sourcing
+│   ├── eventsourcing-snapshots/    # Стратегии снапшотов
+│   ├── eventsourcing-replay/       # Event replay и projections
+│   ├── eventsourcing-mongodb/      # Event Sourcing с MongoDB
+│   ├── graphql-service/            # GraphQL Transport
+│   ├── saga-order/                 # Базовая Saga
+│   ├── saga-parallel/              # Параллельные шаги
+│   ├── saga-conditional/           # Условные шаги
+│   └── saga-query-handler/         # Saga Query Handler с read models
+├── cmd/                   # CLI инструменты
+│   ├── potter-gen/        # Code generator CLI
+│   ├── potter-migrate/    # Migration CLI (goose wrapper)
+│   └── protoc-gen-potter/ # Protoc плагин
+└── api/                   # API определения (proto)
 ```
-
-**Примечание**: Директория `internal/` была удалена в версии 1.0.3. Все компоненты перенесены в `framework/adapters/` как built-in адаптеры фреймворка.
 
 ## Testing
 
@@ -119,160 +151,225 @@ make proto          # Сгенерировать proto файлы
 
 ## Examples
 
-Фреймворк включает примеры приложений, демонстрирующие различные возможности. Также см. тесты в каждом пакете как примеры использования API.
+Фреймворк включает comprehensive примеры для всех основных паттернов. Полная документация: [`examples/README.md`](examples/README.md)
 
-### Saga Pattern Examples
+### Saga Pattern
 
-- [Order Saga](examples/saga-order/) - Пример Order Saga с резервированием товара, оплатой, доставкой
-- [Warehouse 2PC Integration](examples/saga-warehouse-integration/) - Интеграция Saga с 2PC координатором
+- **saga-order** - Базовая Saga с последовательными шагами и компенсацией
+- **saga-parallel** - Параллельное выполнение независимых операций
+- **saga-conditional** - Условное выполнение шагов на основе контекста
+- **saga-query-handler** - CQRS query handler с read models для мониторинга саг
 
-### Quick Start: Saga Pattern
+### Event Sourcing
 
-```go
-import "github.com/akriventsev/potter/framework/saga"
+- **eventsourcing-basic** - Базовые операции с Event Sourced агрегатами
+- **eventsourcing-snapshots** - Три стратегии снапшотов (Frequency, TimeBased, Hybrid)
+- **eventsourcing-replay** - Event replay и rebuilding проекций
+- **eventsourcing-mongodb** - Event Sourcing с MongoDB вместо PostgreSQL
 
-// Определение саги
-sagaDef := saga.NewSagaBuilder("order_saga").
-    AddStep(
-        saga.NewCommandStep(
-            "reserve_inventory",
-            commandBus,
-            ReserveInventoryCommand{...},
-            ReleaseInventoryCommand{...},
-        ),
-    ).
-    AddStep(
-        saga.NewCommandStep(
-            "process_payment",
-            commandBus,
-            ProcessPaymentCommand{...},
-            RefundPaymentCommand{...},
-        ),
-    ).
-    WithPersistence(persistence).
-    WithEventBus(eventBus).
-    Build()
+### GraphQL Transport
 
-// Создание и выполнение саги
-orchestrator := saga.NewDefaultOrchestrator(persistence, eventBus)
-instance := sagaDef.CreateInstance(sagaContext)
-err := orchestrator.Execute(ctx, instance)
-```
+- **graphql-service** - Product Catalog с автогенерацией схем, queries/mutations/subscriptions
 
-См. [Saga Pattern Documentation](framework/saga/README.md) для подробной информации.
+### Code Generation
 
-### Warehouse Example
+- **codegen** - Генерация CQRS приложений из proto файлов
 
-Полноценное приложение для управления складскими остатками с реализацией Two-Phase Commit (2PC) через NATS, кешированием в Redis и snapshot в PostgreSQL.
-
-**Статус:** Поддерживаемый showcase — пример обновляется при изменении ядра фреймворка и синхронизируется с версиями фреймворка.
-
-**Основные возможности:**
-- Управление товарами и складами
-- Изменение количества товаров на складах
-- Резервирование товаров с 2PC транзакциями
-- Кеширование данных в Redis
-- Event sourcing и публикация событий
-
-**What's Included:**
-- Full hexagonal architecture с четким разделением слоев
-- CQRS с CommandBus/QueryBus для разделения read/write моделей
-- Two-Phase Commit координация через NATS для распределенных транзакций
-- Redis кеширование для read models
-- PostgreSQL для persistence и transaction log
-- Prometheus метрики интеграция
-- REST API с Gin фреймворком
-- Docker Compose для локальной разработки
-
-**Запуск:**
-```bash
-cd examples/warehouse
-make docker-up    # Запуск PostgreSQL, Redis, NATS, Prometheus
-make migrate      # Применение SQL миграций
-make run          # Запуск приложения на порту 8080
-```
-
-**Мониторинг:**
-- Prometheus dashboard: http://localhost:9090
-- NATS monitoring: http://localhost:8222
-- Metrics endpoint: http://localhost:2112/metrics
-
-Подробнее см. [examples/warehouse/README.md](examples/warehouse/README.md)
-
-Для быстрого тестирования API см. [examples/warehouse/api_examples.md](examples/warehouse/api_examples.md)
-
-### Переменные окружения (Warehouse Example)
-
-Warehouse example использует следующие переменные окружения:
-
-- `SERVER_PORT` - порт для HTTP сервера (по умолчанию: 8080)
-- `DATABASE_DSN` - строка подключения к PostgreSQL (по умолчанию: postgres://postgres:postgres@localhost:5432/warehouse?sslmode=disable)
-- `REDIS_ADDR` - адрес Redis сервера (по умолчанию: localhost:6379)
-- `REDIS_PASSWORD` - пароль Redis (по умолчанию: пусто)
-- `REDIS_DB` - номер базы данных Redis (по умолчанию: 0)
-- `NATS_URL` - URL NATS сервера (по умолчанию: nats://localhost:4222)
-- `METRICS_ENABLED` - включить метрики (по умолчанию: true)
-- `METRICS_PORT` - порт для метрик (по умолчанию: 2112)
-
-### Пример запуска
-
-Для запуска warehouse example:
-
-```bash
-cd examples/warehouse
-make docker-up    # Запуск инфраструктуры (PostgreSQL, Redis, NATS, Prometheus)
-make migrate      # Применение SQL миграций
-make run          # Запуск приложения на порту 8080
-```
-
-После запуска приложение будет доступно на `http://localhost:8080`.
-
-Или напрямую:
-
-```bash
-go run examples/warehouse/cmd/server/main.go
-```
-
-С настройкой переменных окружения:
-
-```bash
-SERVER_PORT=8080 \
-DATABASE_DSN="postgres://postgres:postgres@localhost:5432/warehouse?sslmode=disable" \
-REDIS_ADDR=localhost:6379 \
-NATS_URL=nats://localhost:4222 \
-METRICS_ENABLED=true \
-METRICS_PORT=2112 \
-go run examples/warehouse/cmd/server/main.go
-```
+Подробнее см. [`examples/README.md`](examples/README.md) и [`framework/saga/README.md`](framework/saga/README.md)
 
 ## Quick Start
 
-### Запуск примеров
-
-Для быстрого старта используйте warehouse example:
+### Установка
 
 ```bash
-# Запуск warehouse примера
-make example-warehouse
+go get github.com/akriventsev/potter/framework
+```
 
-# Или вручную
-cd examples/warehouse
+### Установка инструментов
+
+```bash
+# Установка всех CLI инструментов
+make install-codegen-tools
+
+# Или по отдельности:
+make install-potter-gen      # Code generator
+make install-potter-migrate  # Migration tool
+make install-goose           # Goose CLI
+```
+
+### Запуск примеров
+
+**Saga Pattern:**
+
+```bash
+cd examples/saga-order
+make docker-up && make migrate && make run
+```
+
+**Event Sourcing:**
+
+```bash
+cd examples/eventsourcing-basic
+make docker-up && make migrate && make run
+```
+
+**GraphQL Transport:**
+
+```bash
+cd examples/graphql-service
+make docker-up && make migrate-up && make generate && make run
+
+make playground  # Открыть GraphQL Playground
+```
+
+### Создание нового проекта
+
+1. Создайте proto файл с Potter аннотациями:
+
+```protobuf
+syntax = "proto3";
+import "github.com/akriventsev/potter/options.proto";
+
+service ProductService {
+  option (potter.service) = {
+    module_name: "product"
+    transport: ["REST", "GRAPHQL"]
+  };
+
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse) {
+    option (potter.command) = {
+      aggregate: "Product"
+      async: true
+    };
+  }
+
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse) {
+    option (potter.query) = {
+      cacheable: true
+      cache_ttl_seconds: 300
+    };
+  }
+}
+```
+
+2. Сгенерируйте приложение:
+
+```bash
+potter-gen init --proto api/service.proto --module myapp --output ./myapp --with-graphql
+```
+
+3. Запустите приложение:
+
+```bash
+cd myapp
 make docker-up
 make migrate
 make run
 ```
+
+Подробнее см. [Code Generator Guide](framework/codegen/README.md)
+
+## Key Features
+
+### GraphQL Transport
+
+Автоматическая генерация GraphQL API из proto файлов:
+- Queries → CQRS QueryBus
+- Mutations → CQRS CommandBus  
+- Subscriptions → EventBus (real-time updates)
+- Query complexity limits и security
+- GraphQL Playground для разработки
+
+Подробнее: [`framework/adapters/transport/GRAPHQL.md`](framework/adapters/transport/GRAPHQL.md)
+
+### Query Builder
+
+Fluent API для построения сложных запросов:
+
+```go
+results, err := repo.Query().
+    Where("status", Eq, "active").
+    Where("created_at", Gte, time.Now().AddDate(0, -1, 0)).
+    OrderBy("created_at", Desc).
+    Limit(10).
+    Execute(ctx)
+```
+
+Поддержка: Postgres, MongoDB, joins, агрегация, full-text search, geo queries
+
+### Schema Migrations
+
+Версионированные миграции через goose:
+
+```bash
+# CLI
+potter-migrate up --database-url postgres://localhost/db
+potter-migrate down 1 --database-url postgres://localhost/db
+potter-migrate status --database-url postgres://localhost/db
+
+# Или напрямую через goose
+goose -dir migrations postgres "postgres://localhost/db" up
+```
+
+```go
+// Программное использование
+import "github.com/akriventsev/potter/framework/migrations"
+
+db, _ := sql.Open("pgx", dsn)
+err := migrations.RunMigrations(db, "./migrations")
+```
+
+Поддержка: SQL миграции (Postgres, MySQL, SQLite), Go миграции (MongoDB), rollback, out-of-order миграции
+
+Подробнее: [`framework/migrations/README.md`](framework/migrations/README.md)
+
+### Projections Framework
+
+Централизованная инфраструктура для проекций:
+
+```go
+projectionMgr := eventsourcing.NewProjectionManager(checkpointStore)
+projectionMgr.RegisterProjection("order_summary", orderSummaryProjection)
+projectionMgr.Start(ctx)
+
+// Rebuild проекций
+projectionMgr.RebuildProjection(ctx, "order_summary")
+```
+
+Возможности: checkpoint management, automatic registration, rebuild support, batch processing
+
+### Saga Query Handler
+
+CQRS query handler для мониторинга саг:
+
+```go
+queryHandler := saga.NewSagaQueryHandler(persistence, readModelStore)
+queryBus.RegisterHandler("GetSagaStatus", queryHandler)
+
+query := &saga.GetSagaStatusQuery{SagaID: "saga-123"}
+result, _ := queryHandler.Handle(ctx, query)
+```
+
+Возможности: read models, оптимизированные запросы, фильтрация, пагинация, метрики
 
 ### Использование фреймворка
 
 Фреймворк предоставляет готовые компоненты для построения CQRS приложений:
 
 - **CommandBus/QueryBus**: Шины для команд и запросов
-- **Invoke Module**: Type-safe invokers для команд и запросов с ожиданием событий
-- **Invoke Examples**: Полная коллекция практических примеров для всех транспортов (NATS, Kafka, REST, gRPC)
-- **EventPublisher**: Публикация доменных событий
-- **Repository адаптеры**: PostgreSQL, MongoDB, InMemory
+- **Invoke Module**: Type-safe invokers с ожиданием событий
+- **EventPublisher/EventBus**: Публикация и подписка на события
+- **GraphQL Transport**: Автогенерация GraphQL API из proto
+- **Query Builder**: Fluent API для сложных запросов
+- **Schema Migrations**: Goose integration для версионирования БД
+- **Projections Framework**: Централизованное управление проекциями
+- **Repository адаптеры**: PostgreSQL, MongoDB, InMemory с advanced indexing
 - **MessageBus адаптеры**: NATS, Kafka, Redis
+- **Event Store адаптеры**: PostgreSQL, MongoDB, EventStoreDB (pending), InMemory
 - **Metrics**: OpenTelemetry интеграция
+- **Code Generator**: Proto-first генерация приложений
+
+Подробнее: [`framework/README.md`](framework/README.md)
 
 ## Code Generator
 
@@ -284,67 +381,26 @@ Potter Framework включает мощный кодогенератор для
 - **Полная структура проекта** - domain, application, infrastructure, presentation слои
 - **Incremental updates** - обновление кода с сохранением пользовательской логики
 - **SDK generation** - type-safe SDK на базе framework/invoke
+- **GraphQL support** - автогенерация GraphQL схем с флагом `--with-graphql`
 - **Protoc integration** - работа как protoc плагин
 
 ### Установка
 
 ```bash
-# Установка CLI инструмента
-make install-potter-gen
-
-# Установка protoc плагина
-make install-protoc-gen-potter
-
-# Или все сразу
-make install-codegen-tools
+make install-codegen-tools  # potter-gen, protoc-gen-potter, potter-migrate, goose
 ```
 
 ### Быстрый старт
 
-1. Создайте proto файл с Potter аннотациями:
-
-```protobuf
-syntax = "proto3";
-import "github.com/akriventsev/potter/options.proto";
-
-service ProductService {
-  option (potter.service) = {
-    module_name: "product"
-    transport: ["REST", "NATS"]
-  };
-
-  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse) {
-    option (potter.command) = {
-      aggregate: "Product"
-      async: true
-    };
-  }
-}
-```
-
-2. Сгенерируйте приложение:
-
 ```bash
-potter-gen init --proto api/service.proto --module myapp --output ./myapp
-```
+# Создание нового проекта
+potter-gen init --proto api/service.proto --module myapp --output ./myapp --with-graphql
 
-3. Проверка синхронности (для CI):
+# Обновление существующего проекта
+potter-gen update --proto api/service.proto --output ./myapp
 
-```bash
-# Проверка расхождений между proto и кодом
+# Проверка синхронности (для CI)
 potter-gen check --proto api/service.proto --output ./myapp
-
-# Команда завершится с ненулевым кодом, если есть расхождения
-# Рекомендуется запускать в CI перед merge для гарантии синхронности
-```
-
-4. Запустите приложение:
-
-```bash
-cd myapp
-make docker-up
-make migrate
-make run
 ```
 
 ### Документация
@@ -353,17 +409,9 @@ make run
 - [Potter Custom Options](api/proto/potter/options.proto) - описание аннотаций
 - [Codegen Example](examples/codegen/README.md) - пример использования
 
-### Примеры
+Подробнее: [`framework/codegen/README.md`](framework/codegen/README.md)
 
-```bash
-# Запуск примера кодогенерации
-make example-codegen
-
-# Просмотр сгенерированного кода
-ls examples/codegen/generated/
-```
-
-#### Invoke Module - Type-safe CQRS Invokers
+## Invoke Module - Type-safe CQRS Invokers
 
 Модуль `framework/invoke/` предоставляет generic-based API для type-safe работы с командами и запросами:
 
@@ -383,28 +431,7 @@ queryInvoker := invoke.NewQueryInvoker[GetProductQuery, GetProductResponse](quer
 result, err := queryInvoker.Invoke(ctx, GetProductQuery{ID: "product-123"})
 ```
 
-Подробнее см. [framework/invoke/README.md](framework/invoke/README.md)
-
-##### Invoke Module Examples
-
-Модуль Invoke предоставляет type-safe CQRS операции. См. практические примеры:
-
-```bash
-cd framework/invoke/examples
-make start-infra  # Запустить NATS, Kafka, Redis, PostgreSQL
-make test-all     # Запустить все примеры
-```
-
-Доступные примеры:
-- Commands: NATS, Kafka
-- Queries: NATS, Kafka, REST, gRPC
-- Advanced: Mixed transports
-
-См. [framework/invoke/examples/README.md](framework/invoke/examples/README.md) для деталей.
-
-**Примечание**: Для локальной разработки используется путь модуля `potter`. При использовании в собственных проектах импортируйте пакеты как `potter/framework/...`. При публикации на GitHub путь модуля можно изменить на `github.com/username/potter`.
-
-См. примеры в `examples/warehouse/` для детальной демонстрации использования.
+Подробнее: [`framework/invoke/README.md`](framework/invoke/README.md) и [`framework/invoke/examples/README.md`](framework/invoke/examples/README.md)
 
 ## Архитектурные решения
 
@@ -415,13 +442,6 @@ make test-all     # Запустить все примеры
 - **Ports** (`framework/transport`) - интерфейсы для транспортов
 - **Adapters** (`framework/adapters`) - реализации портов (REST, gRPC, NATS, репозитории)
 
-### Two-Phase Commit (2PC)
-
-Warehouse example демонстрирует реализацию распределенных транзакций через 2PC:
-- Координатор управляет транзакциями через NATS
-- Участники обрабатывают prepare/commit/abort фазы
-- Все транзакции логируются в PostgreSQL для восстановления
-
 ### CQRS
 
 - **Commands** - изменяют состояние, проходят через `CommandBus`
@@ -430,7 +450,7 @@ Warehouse example демонстрирует реализацию распред
 
 ### Метрики
 
-Все операции автоматически инструментируются через пакет `pkg/metrics`:
+Все операции автоматически инструментируются через пакет `framework/metrics`:
 - Счетчики команд/запросов/событий
 - Длительность выполнения
 - Активные операции
@@ -440,7 +460,49 @@ Warehouse example демонстрирует реализацию распред
 
 - **Gin** - REST API фреймворк
 - **gRPC** - RPC транспорт
+- **gqlgen** - GraphQL сервер
 - **NATS** - Message Queue
+- **Kafka** - Event streaming
 - **OpenTelemetry** - метрики и трейсинг
 - **Prometheus** - экспорт метрик
+- **goose** - Schema migrations
+- **PostgreSQL** - Primary database
+- **MongoDB** - NoSQL database
+
+## Версионирование
+
+Проект следует [Semantic Versioning](https://semver.org/).
+
+**Текущая версия:** 1.5.0 (см. [`VERSION`](VERSION))
+
+**История изменений:**
+
+- **v1.5.0** - Goose integration для миграций
+- **v1.4.0** - GraphQL Transport, Query Builder, Projections Framework, Saga Query Handler
+- **v1.3.x** - Saga Pattern, Event Sourcing enhancements
+- **v1.2.0** - Code Generator, Invoke Module, Testing utilities
+- **v1.1.0** - Event Sourcing базовая поддержка
+- **v1.0.0** - Базовая структура фреймворка
+
+Подробнее: [`ROADMAP.md`](ROADMAP.md)
+
+## Документация
+
+- **Framework Overview**: [`framework/README.md`](framework/README.md)
+- **Examples**: [`examples/README.md`](examples/README.md)
+- **Roadmap**: [`ROADMAP.md`](ROADMAP.md)
+- **Code Generator**: [`framework/codegen/README.md`](framework/codegen/README.md)
+- **GraphQL Transport**: [`framework/adapters/transport/GRAPHQL.md`](framework/adapters/transport/GRAPHQL.md)
+- **Migrations**: [`framework/migrations/README.md`](framework/migrations/README.md)
+- **Saga Pattern**: [`framework/saga/README.md`](framework/saga/README.md)
+- **Event Sourcing**: [`framework/eventsourcing/README.md`](framework/eventsourcing/README.md)
+- **Invoke Module**: [`framework/invoke/README.md`](framework/invoke/README.md)
+
+## Лицензия
+
+MIT
+
+## Авторы
+
+Potter Team
 
