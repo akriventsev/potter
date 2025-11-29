@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"potter/examples/eventsourcing-replay/infrastructure"
-	"potter/examples/eventsourcing-replay/projections"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/examples/eventsourcing-replay/infrastructure"
+	"github.com/akriventsev/potter/examples/eventsourcing-replay/projections"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 func main() {

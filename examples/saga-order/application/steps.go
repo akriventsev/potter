@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"potter/examples/saga-order/domain"
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
-	"potter/framework/invoke"
-	"potter/framework/saga"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/examples/saga-order/domain"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // ReserveInventoryStep шаг резервирования товара

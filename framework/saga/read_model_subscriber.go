@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // SagaReadModelSubscriber подписчик на события саги для обновления read model

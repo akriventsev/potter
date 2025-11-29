@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"potter/framework/adapters/messagebus"
-	"potter/framework/events"
-	"potter/framework/invoke"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 // NewWarehouseSagaDefinition создает новое определение саги для интеграции с warehouse через 2PC

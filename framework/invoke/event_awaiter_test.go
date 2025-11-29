@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"potter/framework/core"
+	"github.com/akriventsev/potter/framework/core"
 )
 
 func TestEventAwaiter_Await_Success(t *testing.T) {

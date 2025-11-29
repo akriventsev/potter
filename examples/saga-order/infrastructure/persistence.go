@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"potter/framework/eventsourcing"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 // NewSagaEventStorePersistence создает EventStore persistence для саг

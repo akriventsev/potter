@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"potter/framework/core"
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // TestCommand тестовая команда

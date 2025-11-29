@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/core"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // InMemoryConfig конфигурация для InMemory адаптера

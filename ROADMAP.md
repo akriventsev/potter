@@ -130,11 +130,11 @@
   - Требуется стабильная версия официального Go client
   - Comprehensive тесты с testcontainers
 
-### GraphQL Transport
-- [ ] GraphQL транспорт для запросов
-- [ ] Автоматическая генерация GraphQL схем из proto
-- [ ] GraphQL subscriptions для real-time обновлений
-- [ ] Интеграция с существующими GraphQL серверами
+### GraphQL Transport ✅
+- ✅ GraphQL транспорт для запросов
+- ✅ Автоматическая генерация GraphQL схем из proto
+- ✅ GraphQL subscriptions для real-time обновлений
+- ✅ Интеграция с существующими GraphQL серверами
 
 ## Версия 1.4 (Планируется)
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // MockCommand для тестирования

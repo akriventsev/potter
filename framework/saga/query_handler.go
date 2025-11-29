@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // GetSagaStatusQuery запрос для получения статуса саги

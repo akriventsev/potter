@@ -3,8 +3,8 @@ package infrastructure
 import (
 	"fmt"
 
-	"potter/framework/eventsourcing"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 // NewSagaEventStorePersistence создает EventStore persistence для саг

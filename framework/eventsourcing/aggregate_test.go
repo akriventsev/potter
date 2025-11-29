@@ -3,7 +3,7 @@ package eventsourcing
 import (
 	"testing"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // TestAggregate тестовый агрегат для проверки функциональности

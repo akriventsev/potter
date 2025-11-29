@@ -10,8 +10,8 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"potter/examples/eventsourcing-snapshots/domain"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/examples/eventsourcing-snapshots/domain"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // NewProductRepositoryWithFrequencyStrategy создает репозиторий с FrequencySnapshotStrategy

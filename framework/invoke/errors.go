@@ -2,7 +2,7 @@
 package invoke
 
 import (
-	"potter/framework/core"
+	"github.com/akriventsev/potter/framework/core"
 )
 
 // Коды ошибок модуля Invoke

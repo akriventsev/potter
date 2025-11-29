@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/invoke"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 // NewConditionalSagaDefinition создает новое определение саги с условными шагами

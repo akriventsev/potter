@@ -57,9 +57,9 @@ func (g *SDKGenerator) generateSDKClient(spec *ParsedSpec, _ *GeneratorConfig) e
 	content.WriteString("\t\"fmt\"\n")
 	content.WriteString("\t\"time\"\n")
 	content.WriteString("\n")
-	content.WriteString("\t\"potter/framework/adapters/messagebus\"\n")
-	content.WriteString("\t\"potter/framework/invoke\"\n")
-	content.WriteString("\t\"potter/framework/transport\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/adapters/messagebus\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/invoke\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/transport\"\n")
 	content.WriteString(")\n\n")
 
 	content.WriteString("// Client SDK client для интеграции\n")

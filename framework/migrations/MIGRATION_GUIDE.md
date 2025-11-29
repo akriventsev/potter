@@ -200,7 +200,7 @@ SELECT * FROM schema_migrations;
 
 **Старый код:**
 ```go
-import "potter/framework/migrations"
+import "github.com/akriventsev/potter/framework/migrations"
 
 migrator := migrations.NewMigrator(migrations.NewPostgresMigrationDB(dsn))
 migrator.RegisterFromFiles("migrations")
@@ -211,7 +211,7 @@ err := migrator.Up(ctx)
 ```go
 import (
     "database/sql"
-    "potter/framework/migrations"
+    "github.com/akriventsev/potter/framework/migrations"
     _ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -272,7 +272,7 @@ func initMigrations(dsn string) error {
 ```go
 import (
     "database/sql"
-    "potter/framework/migrations"
+    "github.com/akriventsev/potter/framework/migrations"
     _ "github.com/jackc/pgx/v5/stdlib"
 )
 

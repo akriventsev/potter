@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/metrics"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/metrics"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // AsyncCommandBus чистый producer команд для NATS pub/sub (produce command)

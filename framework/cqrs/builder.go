@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/metrics"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/metrics"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // CommandHandlerBuilder построитель обработчиков команд

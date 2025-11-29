@@ -6,11 +6,11 @@ import (
 	"reflect"
 	"time"
 
-	eventsadapters "potter/framework/adapters/events"
-	"potter/framework/adapters/messagebus"
-	"potter/framework/events"
-	"potter/framework/invoke"
-	"potter/framework/transport"
+	eventsadapters "github.com/akriventsev/potter/framework/adapters/events"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // CreateOrderCommand команда для создания заказа

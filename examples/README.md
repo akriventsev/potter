@@ -191,6 +191,33 @@ make run
 
 **Документация:** [repository-query-builder/README.md](repository-query-builder/README.md)
 
+## GraphQL Transport Example
+
+### graphql-service
+
+Полнофункциональный Product Catalog Service с GraphQL API.
+
+**Ключевые особенности:**
+- Автогенерация GraphQL схем из proto файлов
+- GraphQL queries для чтения данных (CQRS queries)
+- GraphQL mutations для команд (CQRS commands)
+- GraphQL subscriptions для real-time обновлений (EventBus)
+- Интеграция с Event Sourcing
+- Query complexity limits и security
+- GraphQL Playground для разработки
+
+**Quick Start:**
+```bash
+cd examples/graphql-service
+make docker-up
+make migrate-up
+make generate
+make run
+make playground
+```
+
+**Документация:** [graphql-service/README.md](graphql-service/README.md)
+
 ## Saga Query Handler Example
 
 ### saga-query-handler

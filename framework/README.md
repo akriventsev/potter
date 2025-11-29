@@ -68,9 +68,9 @@ package main
 import (
     "context"
     "log"
-    "potter/framework/container"
-    "potter/framework/cqrs"
-    "potter/framework/transport"
+    "github.com/akriventsev/potter/framework/container"
+    "github.com/akriventsev/potter/framework/cqrs"
+    "github.com/akriventsev/potter/framework/transport"
 )
 
 // Определяем команду
@@ -373,7 +373,7 @@ make test-integration
 `InMemoryTestEnvironment` предоставляет готовую тестовую среду со всеми необходимыми компонентами:
 
 ```go
-import "potter/framework/testing"
+import "github.com/akriventsev/potter/framework/testing"
 
 func TestCreateUserHandler(t *testing.T) {
     // Создаем тестовую среду
@@ -399,7 +399,7 @@ func TestCreateUserHandler(t *testing.T) {
 Для тестирования с DI контейнером:
 
 ```go
-import "potter/framework/testing"
+import "github.com/akriventsev/potter/framework/testing"
 
 func TestApplicationWithContainer(t *testing.T) {
     container := testing.NewTestContainer()
@@ -595,7 +595,7 @@ goose -dir migrations create add_user_roles sql
 ```go
 import (
     "database/sql"
-    "potter/framework/migrations"
+    "github.com/akriventsev/potter/framework/migrations"
     _ "github.com/jackc/pgx/v5/stdlib"
 )
 

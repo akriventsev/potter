@@ -120,7 +120,7 @@ potter-migrate create add_user_roles --migrations-dir ./migrations
 ### Программно
 
 ```go
-import "potter/framework/migrations"
+import "github.com/akriventsev/potter/framework/migrations"
 
 err := migrations.CreateMigration("./migrations", "add_user_roles")
 ```
@@ -175,7 +175,7 @@ potter-migrate up --database-url sqlite3://./database.db --dialect sqlite3 --mig
 ```go
 import (
 	"database/sql"
-	"potter/framework/migrations"
+	"github.com/akriventsev/potter/framework/migrations"
 	
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -276,7 +276,7 @@ migrator.RegisterFromFiles("migrations")
 err := migrator.Up(ctx)
 
 // Новый код
-import "potter/framework/migrations"
+import "github.com/akriventsev/potter/framework/migrations"
 import _ "github.com/jackc/pgx/v5/stdlib"
 
 db, _ := sql.Open("pgx", dsn)

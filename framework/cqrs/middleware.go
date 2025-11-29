@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // LoggingCommandMiddleware логирует выполнение команд

@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"potter/examples/eventsourcing-basic/application"
-	"potter/examples/eventsourcing-basic/infrastructure"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/examples/eventsourcing-basic/application"
+	"github.com/akriventsev/potter/examples/eventsourcing-basic/infrastructure"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 func main() {

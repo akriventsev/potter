@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"potter/framework/adapters/repository"
+	"github.com/akriventsev/potter/framework/adapters/repository"
 )
 
 // User пример entity

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/invoke"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 // NewParallelSagaDefinition создает новое определение саги с параллельными шагами

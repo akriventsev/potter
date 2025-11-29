@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // SagaReadModelProjection проекция для обновления read model из событий саги

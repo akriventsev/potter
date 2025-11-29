@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/events"
-	"potter/framework/metrics"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/metrics"
 )
 
 // SagaOrchestrator интерфейс оркестратора саг

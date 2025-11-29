@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // MessageBusFactory интерфейс фабрики для создания MessageBus адаптеров

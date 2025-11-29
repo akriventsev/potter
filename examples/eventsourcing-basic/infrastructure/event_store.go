@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // NewEventStore создает новый Event Store

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // InMemoryEventStoreConfig конфигурация для InMemory Event Store

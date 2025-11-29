@@ -1,6 +1,6 @@
 package domain
 
-import "potter/framework/events"
+import "github.com/akriventsev/potter/framework/events"
 
 // AccountOpenedEvent событие открытия счета
 type AccountOpenedEvent struct {

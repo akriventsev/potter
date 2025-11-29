@@ -29,7 +29,7 @@ import (
 	"context"
 	"fmt"
 
-	"potter/framework/core"
+	"github.com/akriventsev/potter/framework/core"
 )
 
 // Version представляет версию фреймворка

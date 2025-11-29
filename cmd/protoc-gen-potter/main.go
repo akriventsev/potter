@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
-	"potter/framework/codegen"
+	"github.com/akriventsev/potter/framework/codegen"
 )
 
 func main() {

@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 
-	"potter/framework/events"
-	"potter/framework/invoke"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // CommandBusAdapter адаптер для выполнения команд через CommandBus в SagaStep

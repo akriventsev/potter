@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // AggregateInterface интерфейс для Event Sourced агрегатов

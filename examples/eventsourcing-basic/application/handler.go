@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // Handler HTTP handlers для работы с банковскими счетами

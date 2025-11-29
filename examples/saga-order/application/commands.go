@@ -1,8 +1,8 @@
 package application
 
 import (
-	"potter/examples/saga-order/domain"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/examples/saga-order/domain"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // ReserveInventoryCommand команда резервирования товара

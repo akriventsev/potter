@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // EventPublisherFactory интерфейс фабрики для создания Event Publisher адаптеров

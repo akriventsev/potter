@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // MockEvent для тестирования

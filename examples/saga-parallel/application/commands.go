@@ -1,8 +1,8 @@
 package application
 
 import (
-	"potter/examples/saga-parallel/domain"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/examples/saga-parallel/domain"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // CheckCreditCommand команда проверки кредита

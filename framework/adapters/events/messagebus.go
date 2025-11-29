@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/core"
-	"potter/framework/events"
-	"potter/framework/metrics"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/metrics"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // MessageBusEventConfig конфигурация для MessageBus Event Publisher

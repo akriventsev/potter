@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/invoke"
-	"potter/framework/saga"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // NewValidateOrderStep создает новый шаг валидации заказа

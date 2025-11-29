@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/core"
-	"potter/framework/metrics"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/metrics"
+	"github.com/akriventsev/potter/framework/transport"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

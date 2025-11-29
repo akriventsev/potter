@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"potter/examples/saga-order/domain"
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
-	"potter/framework/invoke"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/examples/saga-order/domain"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 // NewOrderSagaDefinition создает новое определение саги заказа

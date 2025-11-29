@@ -9,8 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"potter/framework/core"
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // MongoDBEventStoreConfig конфигурация для MongoDB Event Store

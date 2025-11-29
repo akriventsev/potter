@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"potter/framework/codegen"
+	"github.com/akriventsev/potter/framework/codegen"
 )
 
 func runInit() {
@@ -95,6 +95,7 @@ func runGenerate() {
 	protoPath := fs.String("proto", "", "Path to proto file")
 	outputDir := fs.String("output", ".", "Output directory")
 	overwrite := fs.Bool("overwrite", false, "Overwrite existing files")
+	withGraphQL := fs.Bool("with-graphql", false, "Generate GraphQL schema and resolvers from proto files")
 
 	fs.Parse(os.Args[2:])
 
@@ -156,6 +157,17 @@ func runGenerate() {
 			fmt.Fprintf(os.Stderr, "Error generating %s: %v\n", gen.Name(), err)
 			os.Exit(1)
 		}
+	}
+
+	// Генерация GraphQL схемы, если указан флаг
+	if *withGraphQL {
+		graphqlGen := codegen.NewGraphQLSchemaGenerator(*outputDir)
+		if err := graphqlGen.Generate(spec, config); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating GraphQL schema: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("GraphQL schema generated successfully")
+		fmt.Println("Next step: run 'gqlgen generate' in api/graphql directory")
 	}
 
 	fmt.Println("Code generation completed")

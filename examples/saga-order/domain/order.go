@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // OrderStatus статус заказа

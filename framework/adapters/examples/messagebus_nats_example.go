@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"potter/framework/adapters/messagebus"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // ExampleNATSMessageBus демонстрирует использование NATS MessageBus адаптера

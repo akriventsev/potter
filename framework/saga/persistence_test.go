@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 func TestInMemoryPersistence_SaveAndLoad(t *testing.T) {

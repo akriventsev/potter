@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 func createTestRepository() (*EventSourcedRepository[*TestAggregate], *InMemoryEventStore, *InMemorySnapshotStore) {

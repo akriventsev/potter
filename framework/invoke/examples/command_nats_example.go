@@ -6,10 +6,10 @@ import (
 	"reflect"
 	"time"
 
-	"potter/framework/adapters/messagebus"
-	"potter/framework/events"
-	"potter/framework/invoke"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // CreateUserCommand команда для создания пользователя

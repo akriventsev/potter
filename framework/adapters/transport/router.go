@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // CommandRouter автоматическая маршрутизация requests к commands

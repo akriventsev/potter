@@ -16,7 +16,7 @@
 
 ```protobuf
 syntax = "proto3";
-import "potter/options.proto";
+import "github.com/akriventsev/potter/options.proto";
 
 service ProductService {
   option (potter.service) = {

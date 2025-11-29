@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"potter/framework/core"
-	"potter/framework/metrics"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/metrics"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // RESTConfig конфигурация для REST адаптера

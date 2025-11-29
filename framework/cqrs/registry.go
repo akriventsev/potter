@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // Registry реестр команд и запросов

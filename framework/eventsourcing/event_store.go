@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 var (

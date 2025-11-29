@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // RegisterCommandHandler регистрирует обработчик команды в реестре и шине

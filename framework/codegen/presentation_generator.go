@@ -42,7 +42,7 @@ func (g *PresentationGenerator) generateRESTHandler(spec *ParsedSpec, config *Ge
 	content.WriteString("\t\"github.com/gin-gonic/gin\"\n")
 	content.WriteString(fmt.Sprintf("\t\"%s/application/command\"\n", config.ModulePath))
 	content.WriteString(fmt.Sprintf("\t\"%s/application/query\"\n", config.ModulePath))
-	content.WriteString("\t\"potter/framework/transport\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/transport\"\n")
 	content.WriteString(")\n\n")
 
 	content.WriteString("// Handler REST API handler\n")

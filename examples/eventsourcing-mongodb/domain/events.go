@@ -1,6 +1,6 @@
 package domain
 
-import "potter/framework/events"
+import "github.com/akriventsev/potter/framework/events"
 
 // ItemAddedEvent событие добавления товара
 type ItemAddedEvent struct {

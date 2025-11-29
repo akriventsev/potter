@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // HandlerFactory фабрика для создания обработчиков

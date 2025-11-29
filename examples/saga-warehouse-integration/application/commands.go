@@ -1,6 +1,6 @@
 package application
 
-import "potter/framework/transport"
+import "github.com/akriventsev/potter/framework/transport"
 
 // ProcessPaymentCommand команда обработки платежа
 type ProcessPaymentCommand struct {

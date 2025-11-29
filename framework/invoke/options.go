@@ -4,8 +4,8 @@ package invoke
 import (
 	"time"
 
-	"potter/framework/events"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // InvokeOptions опции для вызова команды или запроса

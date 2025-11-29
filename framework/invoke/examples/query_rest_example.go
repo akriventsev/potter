@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	transportadapters "potter/framework/adapters/transport"
-	"potter/framework/invoke"
-	"potter/framework/transport"
+	transportadapters "github.com/akriventsev/potter/framework/adapters/transport"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // GetProductQuery запрос для получения продукта

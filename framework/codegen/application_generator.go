@@ -55,9 +55,9 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	} else {
 		content.WriteString("\t\"domain\"\n")
 	}
-	content.WriteString("\t\"potter/framework/events\"\n")
-	content.WriteString("\t\"potter/framework/invoke\"\n")
-	content.WriteString("\t\"potter/framework/transport\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/events\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/invoke\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/transport\"\n")
 	content.WriteString(")\n\n")
 
 	// Генерация команды
@@ -170,7 +170,7 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	content.WriteString("\n")
 	content.WriteString(fmt.Sprintf("\t\"%s/domain\"\n", config.ModulePath))
 	content.WriteString(fmt.Sprintf("\t\"%s/infrastructure/cache\"\n", config.ModulePath))
-	content.WriteString("\t\"potter/framework/transport\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/transport\"\n")
 	content.WriteString(")\n\n")
 
 	// Генерация запроса

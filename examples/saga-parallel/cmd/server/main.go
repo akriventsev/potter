@@ -12,14 +12,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"potter/examples/saga-parallel/application"
-	"potter/examples/saga-parallel/domain"
-	"potter/examples/saga-parallel/infrastructure"
-	adapterevents "potter/framework/adapters/events"
-	"potter/framework/adapters/messagebus"
-	"potter/framework/events"
-	"potter/framework/invoke"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/examples/saga-parallel/application"
+	"github.com/akriventsev/potter/examples/saga-parallel/domain"
+	"github.com/akriventsev/potter/examples/saga-parallel/infrastructure"
+	adapterevents "github.com/akriventsev/potter/framework/adapters/events"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 type Config struct {

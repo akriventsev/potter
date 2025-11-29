@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // JSONSerializer реализация JSON сериализатора

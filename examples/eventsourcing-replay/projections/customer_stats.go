@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // CustomerStatsProjection проекция для статистики клиентов

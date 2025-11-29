@@ -4,7 +4,7 @@ package potter;
 
 import "google/protobuf/descriptor.proto";
 
-option go_package = "potter/api/proto/potter";
+option go_package = "github.com/akriventsev/potter/api/proto/potter";
 
 // Potter custom options для аннотации CQRS компонентов
 

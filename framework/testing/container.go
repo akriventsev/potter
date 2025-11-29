@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"potter/framework/container"
+	"github.com/akriventsev/potter/framework/container"
 )
 
 // NewTestContainer создает тестовый контейнер с дефолтными настройками

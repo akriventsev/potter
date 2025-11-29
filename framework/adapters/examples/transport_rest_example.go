@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	transportadapters "potter/framework/adapters/transport"
-	"potter/framework/transport"
+	transportadapters "github.com/akriventsev/potter/framework/adapters/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // ExampleRESTAdapter демонстрирует использование REST Transport адаптера

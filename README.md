@@ -33,6 +33,8 @@
 Поддерживаются следующие транспорты:
 - REST API (Gin)
 - gRPC
+- WebSocket
+- GraphQL (gqlgen)
 - Message Queue (NATS)
 
 ## Метрики
@@ -127,7 +129,7 @@ make proto          # Сгенерировать proto файлы
 ### Quick Start: Saga Pattern
 
 ```go
-import "potter/framework/saga"
+import "github.com/akriventsev/potter/framework/saga"
 
 // Определение саги
 sagaDef := saga.NewSagaBuilder("order_saga").
@@ -303,7 +305,7 @@ make install-codegen-tools
 
 ```protobuf
 syntax = "proto3";
-import "potter/options.proto";
+import "github.com/akriventsev/potter/options.proto";
 
 service ProductService {
   option (potter.service) = {

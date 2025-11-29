@@ -302,8 +302,8 @@ func (g *DomainGenerator) generateEvents(spec *ParsedSpec, _ *GeneratorConfig) e
 	content.WriteString("\t\"time\"\n")
 	content.WriteString("\n")
 	content.WriteString("\t\"github.com/google/uuid\"\n")
-	content.WriteString("\t\"potter/framework/events\"\n")
-	content.WriteString("\t\"potter/framework/invoke\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/events\"\n")
+	content.WriteString("\t\"github.com/akriventsev/potter/framework/invoke\"\n")
 	content.WriteString(")\n\n")
 
 	// Базовые типы

@@ -4,7 +4,7 @@ package saga
 import (
 	"time"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // SagaStartedEvent событие начала выполнения саги

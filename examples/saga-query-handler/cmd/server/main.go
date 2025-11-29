@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"potter/examples/saga-query-handler/application"
-	"potter/examples/saga-query-handler/infrastructure"
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
-	"potter/framework/saga"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/examples/saga-query-handler/application"
+	"github.com/akriventsev/potter/examples/saga-query-handler/infrastructure"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/saga"
+	"github.com/akriventsev/potter/framework/transport"
 
 	"github.com/gin-gonic/gin"
 )

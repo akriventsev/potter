@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"potter/framework/core"
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // PostgresEventStoreConfig конфигурация для PostgreSQL Event Store

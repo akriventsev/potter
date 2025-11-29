@@ -4,7 +4,7 @@ package invoke
 import (
 	"fmt"
 
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // SubjectResolver интерфейс для динамического определения subjects команд и событий

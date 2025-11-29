@@ -5,8 +5,8 @@ import (
 	"context"
 	"testing"
 
-	"potter/framework/core"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // TestQuery тестовый запрос

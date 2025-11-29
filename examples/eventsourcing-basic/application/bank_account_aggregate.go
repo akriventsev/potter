@@ -1,9 +1,9 @@
 package application
 
 import (
-	"potter/examples/eventsourcing-basic/domain"
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/examples/eventsourcing-basic/domain"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // BankAccountAggregate обертка над доменным агрегатом для использования в репозитории

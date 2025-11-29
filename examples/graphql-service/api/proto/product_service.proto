@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package product;
+
+import "github.com/akriventsev/potter/options.proto";
+
+option go_package = "product/api";
+
+// ProductService демонстрирует GraphQL Transport
+service ProductService {
+  option (potter.service) = {
+    module_name: "product"
+    transport: ["GraphQL", "REST"]
+  };
+
+  // Queries
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse) {
+    option (potter.query) = {
+      cacheable: true
+      cache_ttl_seconds: 300
+      read_model: "ProductReadModel"
+    };
+  }
+
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option (potter.query) = {
+      cacheable: true
+      cache_ttl_seconds: 60
+    };
+  }
+
+  // Mutations (Commands)
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse) {
+    option (potter.command) = {
+      aggregate: "Product"
+      async: true
+      idempotent: true
+      timeout_seconds: 30
+    };
+  }
+
+  rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse) {
+    option (potter.command) = {
+      aggregate: "Product"
+      async: false
+    };
+  }
+
+  rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse) {
+    option (potter.command) = {
+      aggregate: "Product"
+      async: false
+    };
+  }
+}
+
+// Aggregate
+message Product {
+  option (potter.aggregate) = {
+    name: "Product"
+    repository: "postgres"
+  };
+
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  int32 stock = 5;
+  string category = 6;
+  int64 created_at = 7;
+  int64 updated_at = 8;
+}
+
+// Events (для Subscriptions)
+message ProductCreatedEvent {
+  option (potter.event) = {
+    event_type: "product.created"
+    aggregate: "Product"
+    version: 1
+  };
+
+  string product_id = 1;
+  string name = 2;
+  double price = 3;
+  int32 stock = 4;
+}
+
+message ProductUpdatedEvent {
+  option (potter.event) = {
+    event_type: "product.updated"
+    aggregate: "Product"
+    version: 1
+  };
+
+  string product_id = 1;
+  string name = 2;
+  double price = 3;
+  int32 stock = 4;
+}
+
+message ProductDeletedEvent {
+  option (potter.event) = {
+    event_type: "product.deleted"
+    aggregate: "Product"
+    version: 1
+  };
+
+  string product_id = 1;
+}
+
+// Request/Response messages
+message GetProductRequest {
+  string id = 1;
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+message ListProductsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string category = 3;
+  double min_price = 4;
+  double max_price = 5;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message CreateProductRequest {
+  string name = 1;
+  string description = 2;
+  double price = 3;
+  int32 stock = 4;
+  string category = 5;
+}
+
+message CreateProductResponse {
+  string product_id = 1;
+  string message = 2;
+}
+
+message UpdateProductRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  int32 stock = 5;
+  string category = 6;
+}
+
+message UpdateProductResponse {
+  string message = 1;
+}
+
+message DeleteProductRequest {
+  string id = 1;
+}
+
+message DeleteProductResponse {
+  string message = 1;
+}
+

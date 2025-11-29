@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"potter/framework/core"
+	"github.com/akriventsev/potter/framework/core"
 )
 
 // Module представляет модуль приложения

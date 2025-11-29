@@ -86,8 +86,8 @@ graph TB
 package domain
 
 import (
-    "potter/framework/events"
-    "potter/framework/eventsourcing"
+    "github.com/akriventsev/potter/framework/events"
+    "github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 type BankAccount struct {
@@ -162,7 +162,7 @@ package infrastructure
 
 import (
     "context"
-    "potter/framework/eventsourcing"
+    "github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 func SetupRepository() *eventsourcing.EventSourcedRepository[*BankAccount] {

@@ -113,9 +113,9 @@ package main
 
 import (
     "context"
-    "potter/framework/saga"
-    "potter/framework/events"
-    "potter/framework/transport"
+    "github.com/akriventsev/potter/framework/saga"
+    "github.com/akriventsev/potter/framework/events"
+    "github.com/akriventsev/potter/framework/transport"
 )
 
 func main() {

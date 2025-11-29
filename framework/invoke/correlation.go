@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"potter/framework/events"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // Константы для ключей контекста

@@ -28,7 +28,7 @@ framework/adapters/
 
 **Пример использования:**
 ```go
-import "potter/framework/adapters/messagebus"
+import "github.com/akriventsev/potter/framework/adapters/messagebus"
 
 // Создание NATS адаптера
 builder := messagebus.NewNATSAdapterBuilder().
@@ -64,7 +64,7 @@ err = adapter.Subscribe(ctx, "users.*", func(ctx context.Context, msg *transport
 
 **Пример использования:**
 ```go
-import "potter/framework/adapters/events"
+import "github.com/akriventsev/potter/framework/adapters/events"
 
 // Создание Kafka Event Publisher
 config := events.KafkaEventConfig{
@@ -96,7 +96,7 @@ Generic адаптеры для работы с различными базам�
 
 **Пример использования:**
 ```go
-import "potter/framework/adapters/repository"
+import "github.com/akriventsev/potter/framework/adapters/repository"
 
 // Создание PostgreSQL репозитория
 config := repository.PostgresConfig{
@@ -119,17 +119,18 @@ found, err := repo.FindByID(ctx, user.ID())
 
 ### Transport адаптеры
 
-Адаптеры для различных транспортных протоколов (HTTP, gRPC, WebSocket).
+Адаптеры для различных транспортных протоколов (HTTP, gRPC, WebSocket, GraphQL).
 
 | Адаптер | Описание | Когда использовать |
 |---------|----------|-------------------|
 | **REST** | REST API с поддержкой CommandBus/QueryBus | HTTP API, веб-приложения |
 | **gRPC** | gRPC сервисы | Микросервисы, высокопроизводительные API |
 | **WebSocket** | WebSocket сервер | Real-time коммуникация, event streaming |
+| **GraphQL** | GraphQL API с автогенерацией схем | Гибкие API, клиенты с различными требованиями к данным |
 
 **Пример использования:**
 ```go
-import "potter/framework/adapters/transport"
+import "github.com/akriventsev/potter/framework/adapters/transport"
 
 // Создание REST адаптера
 config := transport.RESTConfig{
@@ -150,6 +151,33 @@ adapter.RegisterQuery("GET", "/users/:id", GetUserQuery{})
 err = adapter.Start(ctx)
 ```
 
+**Пример использования GraphQL:**
+```go
+import "github.com/akriventsev/potter/framework/adapters/transport"
+
+// Создание GraphQL адаптера
+config := transport.DefaultGraphQLConfig()
+config.Port = 8082
+config.EnablePlayground = true
+
+adapter, err := transport.NewGraphQLAdapter(
+    config,
+    commandBus,
+    queryBus,
+    eventBus,
+    schema, // graphql.ExecutableSchema
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Запуск сервера
+err = adapter.Start(ctx)
+```
+
+Подробнее см. [GraphQL Transport Documentation](transport/GRAPHQL.md).
+```
+
 ## Фабрики адаптеров
 
 Для удобного создания адаптеров предоставляются фабрики:
@@ -157,7 +185,7 @@ err = adapter.Start(ctx)
 ### MessageBus Factory
 
 ```go
-import "potter/framework/adapters/messagebus"
+import "github.com/akriventsev/potter/framework/adapters/messagebus"
 
 factory := messagebus.NewMessageBusFactory()
 
@@ -173,7 +201,7 @@ kafkaBus, err := factory.Create("kafka", kafkaConfig)
 ### Event Publisher Factory
 
 ```go
-import "potter/framework/adapters/events"
+import "github.com/akriventsev/potter/framework/adapters/events"
 
 factory := events.NewEventPublisherFactory()
 
@@ -185,7 +213,7 @@ publisher, err := factory.Create("kafka", kafkaConfig)
 ### Repository Factory
 
 ```go
-import "potter/framework/adapters/repository"
+import "github.com/akriventsev/potter/framework/adapters/repository"
 
 factory := repository.NewRepositoryFactory()
 

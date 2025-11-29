@@ -1,8 +1,8 @@
 package application
 
 import (
-	"potter/examples/eventsourcing-mongodb/domain"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/examples/eventsourcing-mongodb/domain"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // NewInventoryRepository создает репозиторий для Inventory агрегата

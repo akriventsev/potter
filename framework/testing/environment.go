@@ -5,10 +5,10 @@ import (
 	"context"
 	"testing"
 
-	"potter/framework/adapters/messagebus"
-	"potter/framework/container"
-	"potter/framework/events"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/container"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // InMemoryTestEnvironment тестовая среда с готовыми in-memory компонентами

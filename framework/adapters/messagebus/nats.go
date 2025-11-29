@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"potter/framework/core"
-	"potter/framework/metrics"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/core"
+	"github.com/akriventsev/potter/framework/metrics"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // NATSConfig конфигурация для NATS адаптера

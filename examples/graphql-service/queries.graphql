@@ -1,0 +1,164 @@
+# ============================================
+# Queries (Чтение данных)
+# ============================================
+
+# Получить продукт по ID
+query GetProduct {
+  product(id: "550e8400-e29b-41d4-a716-446655440000") {
+    id
+    name
+    description
+    price
+    stock
+    category
+    createdAt
+    updatedAt
+  }
+}
+
+# Получить список продуктов с пагинацией
+query ListProducts {
+  products(page: 1, pageSize: 10) {
+    products {
+      id
+      name
+      price
+      stock
+      category
+    }
+    total
+    page
+    pageSize
+  }
+}
+
+# Фильтрация продуктов по категории и цене
+query FilterProducts {
+  products(
+    page: 1
+    pageSize: 20
+    category: "Electronics"
+    minPrice: 100.0
+    maxPrice: 1000.0
+  ) {
+    products {
+      id
+      name
+      price
+      category
+    }
+    total
+  }
+}
+
+# ============================================
+# Mutations (Изменение данных)
+# ============================================
+
+# Создать новый продукт
+mutation CreateProduct {
+  createProduct(input: {
+    name: "Laptop Dell XPS 15"
+    description: "High-performance laptop for developers"
+    price: 1499.99
+    stock: 25
+    category: "Electronics"
+  }) {
+    productId
+    message
+  }
+}
+
+# Обновить продукт
+mutation UpdateProduct {
+  updateProduct(input: {
+    id: "550e8400-e29b-41d4-a716-446655440000"
+    name: "Laptop Dell XPS 15 (Updated)"
+    description: "Updated description"
+    price: 1399.99
+    stock: 30
+    category: "Electronics"
+  }) {
+    message
+  }
+}
+
+# Удалить продукт
+mutation DeleteProduct {
+  deleteProduct(input: {
+    id: "550e8400-e29b-41d4-a716-446655440000"
+  }) {
+    message
+  }
+}
+
+# ============================================
+# Subscriptions (Real-time обновления)
+# ============================================
+
+# Подписка на создание продуктов
+subscription OnProductCreated {
+  productCreated {
+    productId
+    name
+    price
+    stock
+  }
+}
+
+# Подписка на обновление продуктов
+subscription OnProductUpdated {
+  productUpdated {
+    productId
+    name
+    price
+    stock
+  }
+}
+
+# Подписка на удаление продуктов
+subscription OnProductDeleted {
+  productDeleted {
+    productId
+  }
+}
+
+# ============================================
+# Сложные запросы
+# ============================================
+
+# Запрос с переменными
+query GetProductWithVariables($productId: ID!) {
+  product(id: $productId) {
+    id
+    name
+    price
+  }
+}
+
+# Variables:
+# {
+#   "productId": "550e8400-e29b-41d4-a716-446655440000"
+# }
+
+# Batch запрос (несколько операций)
+query BatchQuery {
+  electronics: products(category: "Electronics", pageSize: 5) {
+    products { id name price }
+  }
+  books: products(category: "Books", pageSize: 5) {
+    products { id name price }
+  }
+}
+
+# Introspection query (для получения схемы)
+query IntrospectionQuery {
+  __schema {
+    types {
+      name
+      kind
+      description
+    }
+  }
+}
+

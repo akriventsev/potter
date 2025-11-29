@@ -3,7 +3,7 @@ package eventsourcing
 import (
 	"fmt"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // EventSourcedAggregate базовый класс для агрегатов с Event Sourcing

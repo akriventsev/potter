@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/core"
+	"github.com/akriventsev/potter/framework/core"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )

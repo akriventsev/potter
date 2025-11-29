@@ -1,8 +1,8 @@
 package domain
 
 import (
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // Order Event Sourced агрегат для заказа

@@ -11,9 +11,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"potter/examples/eventsourcing-mongodb/application"
-	"potter/examples/eventsourcing-mongodb/domain"
-	"potter/examples/eventsourcing-mongodb/infrastructure"
+	"github.com/akriventsev/potter/examples/eventsourcing-mongodb/application"
+	"github.com/akriventsev/potter/examples/eventsourcing-mongodb/domain"
+	"github.com/akriventsev/potter/examples/eventsourcing-mongodb/infrastructure"
 )
 
 type Config struct {

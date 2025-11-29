@@ -2,8 +2,8 @@ package domain
 
 import (
 	"errors"
-	"potter/framework/events"
-	"potter/framework/eventsourcing"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/eventsourcing"
 )
 
 // Product Event Sourced агрегат для продукта

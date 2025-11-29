@@ -12,13 +12,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"potter/examples/saga-conditional/application"
-	"potter/examples/saga-conditional/infrastructure"
-	adapterevents "potter/framework/adapters/events"
-	"potter/framework/adapters/messagebus"
-	"potter/framework/events"
-	"potter/framework/invoke"
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/examples/saga-conditional/application"
+	"github.com/akriventsev/potter/examples/saga-conditional/infrastructure"
+	adapterevents "github.com/akriventsev/potter/framework/adapters/events"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 type Config struct {

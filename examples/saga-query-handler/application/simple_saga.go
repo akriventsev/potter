@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/saga"
+	"github.com/akriventsev/potter/framework/saga"
 )
 
 // SimpleSagaDefinition создает простое определение саги для демонстрации

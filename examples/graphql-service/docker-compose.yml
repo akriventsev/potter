@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: graphql-service-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: graphql_service
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:latest
+    container_name: graphql-service-nats
+    command: -js
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  graphql-service:
+    build: .
+    container_name: graphql-service-app
+    ports:
+      - "8082:8082"
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/graphql_service?sslmode=disable
+      NATS_URL: nats://nats:4222
+      GRAPHQL_PLAYGROUND_ENABLED: "true"
+      GRAPHQL_INTROSPECTION_ENABLED: "true"
+      SERVER_PORT: "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/app/migrations
+
+networks:
+  default:
+    name: graphql-network
+
+volumes:
+  postgres_data:
+

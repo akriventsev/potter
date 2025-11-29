@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"potter/framework/events"
-	"potter/framework/fsm"
-	"potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/fsm"
+	"github.com/akriventsev/potter/framework/invoke"
 
 	"github.com/google/uuid"
 )

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"potter/framework/core"
+	"github.com/akriventsev/potter/framework/core"
 )
 
 // Mapper интерфейс для преобразования между entity и database rows

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	eventsadapters "potter/framework/adapters/events"
-	frameworkevents "potter/framework/events"
+	eventsadapters "github.com/akriventsev/potter/framework/adapters/events"
+	frameworkevents "github.com/akriventsev/potter/framework/events"
 )
 
 // ExampleKafkaEventPublisher демонстрирует использование Kafka Event Publisher

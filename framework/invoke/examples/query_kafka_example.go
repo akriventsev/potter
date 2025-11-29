@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/adapters/messagebus"
-	"potter/framework/invoke"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/adapters/messagebus"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/transport"
 	"github.com/segmentio/kafka-go"
 )
 

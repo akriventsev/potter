@@ -448,8 +448,8 @@ resolver := invoke.NewStaticSubjectResolver(
 ```go
 import (
     "errors"
-    "potter/framework/core"
-    "potter/framework/invoke"
+    "github.com/akriventsev/potter/framework/core"
+    "github.com/akriventsev/potter/framework/invoke"
 )
 
 // ...

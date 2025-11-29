@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // TestSaga_EndToEnd выполняет полный цикл выполнения саги с persistence и orchestrator

@@ -4,7 +4,7 @@ package invoke
 import (
 	"fmt"
 
-	"potter/framework/events"
+	"github.com/akriventsev/potter/framework/events"
 )
 
 // ErrorEvent интерфейс для событий об ошибках, расширяющий events.Event

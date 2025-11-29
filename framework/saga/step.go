@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"potter/framework/events"
-	"potter/framework/invoke"
-	"potter/framework/transport"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/transport"
 )
 
 // SagaStep интерфейс шага саги

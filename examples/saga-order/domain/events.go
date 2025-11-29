@@ -3,8 +3,8 @@ package domain
 import (
 	"fmt"
 
-	"potter/framework/events"
-	"potter/framework/invoke"
+	"github.com/akriventsev/potter/framework/events"
+	"github.com/akriventsev/potter/framework/invoke"
 )
 
 // OrderCreatedEvent событие создания заказа
