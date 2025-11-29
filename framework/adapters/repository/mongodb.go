@@ -48,15 +48,14 @@ func DefaultMongoConfig() MongoConfig {
 	}
 }
 
-// MongoRepository[T Entity] generic MongoDB репозиторий
-// NOTE: Текущая реализация покрывает только базовые CRUD операции.
-// Следующие функции планируются, но еще не реализованы:
-// - Query building для сложных запросов
-// - Миграции схемы БД
-// - Индексирование
-// - TTL (Time To Live) для автоматического удаления устаревших записей
-// - Change streams для подписки на изменения в коллекции
-// TODO: Реализовать query builder, migrations, indexing, TTL и change streams в последующих версиях
+// MongoRepository[T Entity] generic MongoDB репозиторий.
+// 
+// Current implementation provides basic CRUD operations with BSON serialization.
+// Advanced features (query builder, schema migrations, automatic indexing, TTL,
+// change streams) are planned for future releases. For complex queries, use MongoDB
+// aggregation pipeline via custom methods.
+// 
+// См. ROADMAP.md для отслеживания прогресса по планируемым улучшениям.
 type MongoRepository[T Entity] struct {
 	config     MongoConfig
 	client     *mongo.Client

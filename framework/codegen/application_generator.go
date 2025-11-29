@@ -197,40 +197,67 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	content.WriteString(fmt.Sprintf("type %s struct {\n", handlerName))
 
 	// Определяем какой репозиторий использовать
-	// Для query используем первый агрегат, если есть (можно расширить логику)
-	var repoType string
-	if len(spec.Aggregates) > 0 {
-		firstAgg := spec.Aggregates[0]
-		repoType = fmt.Sprintf("domain.%sRepository", firstAgg.Name)
-		repoVarName := strings.ToLower(firstAgg.Name) + "Repo"
-		content.WriteString(fmt.Sprintf("\t%s %s\n", repoVarName, repoType))
+	// Если query использует read model, добавляем комментарий о read-model repository
+	// Если невозможно однозначно определить агрегат, не создаем поле автоматически,
+	// а добавляем комментарий с инструкциями
+	hasReadModel := query.ReadModel != ""
+	hasAggregates := len(spec.Aggregates) > 0
+	
+	if hasReadModel {
+		// Query использует read model - добавляем комментарий о read-model repository
+		content.WriteString("\t// TODO: Add read-model repository field here\n")
+		content.WriteString(fmt.Sprintf("\t// This query uses read model: %s\n", query.ReadModel))
+		content.WriteString("\t// Example: readModelRepo ReadModelRepository\n")
+		content.WriteString("\t// Example: readModelRepo domain.ReadModelRepository\n")
+	} else if !hasAggregates {
+		// Если нет агрегатов, добавляем комментарий с инструкциями
+		content.WriteString("\t// TODO: Add repository field here based on your query data source\n")
+		content.WriteString("\t// If query reads aggregate data, add aggregate repository:\n")
+		content.WriteString("\t//   Example: repo domain.SomeRepository\n")
+		content.WriteString("\t// If query uses read model, add read-model repository:\n")
+		content.WriteString("\t//   Example: readModelRepo ReadModelRepository\n")
+		content.WriteString("\t//   Example: readModelRepo domain.ReadModelRepository\n")
 	} else {
-		// Если нет агрегатов, используем interface{} (упрощенно)
-		content.WriteString("\t// TODO: Add repository field based on query requirements\n")
+		// Есть агрегаты, но нет явной связи query с агрегатом
+		// Не создаем поле автоматически, а добавляем комментарий с инструкциями
+		content.WriteString("\t// TODO: Add repository field here\n")
+		content.WriteString("\t// Cannot automatically determine which repository to use for this query.\n")
+		content.WriteString("\t// If query reads aggregate data, add the appropriate aggregate repository:\n")
+		for _, agg := range spec.Aggregates {
+			content.WriteString(fmt.Sprintf("\t//   Example: %sRepo domain.%sRepository\n",
+				strings.ToLower(agg.Name), agg.Name))
+		}
+		content.WriteString("\t// If query uses read model, add read-model repository:\n")
+		content.WriteString("\t//   Example: readModelRepo ReadModelRepository\n")
+		content.WriteString("\t//   Example: readModelRepo domain.ReadModelRepository\n")
 	}
+	
 	if query.Cacheable {
 		content.WriteString("\tcache cache.CacheService\n")
 	}
 	content.WriteString("}\n\n")
 
 	content.WriteString(fmt.Sprintf("// New%s создает новый обработчик\n", handlerName))
-	if len(spec.Aggregates) > 0 {
-		firstAgg := spec.Aggregates[0]
-		repoVarName := strings.ToLower(firstAgg.Name) + "Repo"
-		repoType = fmt.Sprintf("domain.%sRepository", firstAgg.Name)
-		content.WriteString(fmt.Sprintf("func New%s(%s %s", handlerName, repoVarName, repoType))
+	
+	// В конструкторе также не создаем параметры репозитория автоматически,
+	// если невозможно однозначно определить
+	if hasReadModel || !hasAggregates {
+		// Для read-model или когда нет агрегатов - не добавляем параметры репозитория
+		content.WriteString(fmt.Sprintf("func New%s(", handlerName))
 		if query.Cacheable {
-			content.WriteString(", cache cache.CacheService")
+			content.WriteString("cache cache.CacheService")
 		}
 		content.WriteString(fmt.Sprintf(") *%s {\n", handlerName))
 		content.WriteString(fmt.Sprintf("\treturn &%s{\n", handlerName))
-		content.WriteString(fmt.Sprintf("\t\t%s: %s,\n", repoVarName, repoVarName))
 		if query.Cacheable {
 			content.WriteString("\t\tcache: cache,\n")
 		}
 		content.WriteString("\t}\n")
 		content.WriteString("}\n\n")
 	} else {
+		// Есть агрегаты, но нет явной связи - не добавляем параметры автоматически
+		// Добавляем комментарий с инструкциями
+		content.WriteString(fmt.Sprintf("// TODO: Add repository parameter(s) to constructor based on your query data source\n"))
 		content.WriteString(fmt.Sprintf("func New%s(", handlerName))
 		if query.Cacheable {
 			content.WriteString("cache cache.CacheService")

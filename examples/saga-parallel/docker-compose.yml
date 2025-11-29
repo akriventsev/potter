@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: saga-parallel-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: saga_parallel
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - saga-net
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: saga-parallel-nats
+    ports:
+      - "4223:4222"
+    command: ["-js"]
+    networks:
+      - saga-net
+
+volumes:
+  postgres_data:
+
+networks:
+  saga-net:
+    driver: bridge
+

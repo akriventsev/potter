@@ -2,19 +2,41 @@
 
 План развития Potter Framework.
 
-## Версия 1.3 (Планируется)
+## Completed (v1.0.x - v1.3.x)
+
+- ✅ Event Sourcing with Postgres/MongoDB
+- ✅ Saga Pattern with FSM
+- ✅ CQRS Invoke Module
+- ✅ Code Generator from Protobuf
+
+## Версия 1.3.0
 
 ### Event Sourcing
-- [ ] Полная поддержка Event Sourcing паттерна
-- [ ] Event Store адаптеры (PostgreSQL, MongoDB, EventStore)
-- [ ] Snapshot механизм для оптимизации восстановления состояния
-- [ ] Event replay и projection rebuilding
+- [x] Полная поддержка Event Sourcing паттерна
+- [x] Event Store адаптеры (PostgreSQL, MongoDB, InMemory)
+- [x] Snapshot механизм для оптимизации восстановления состояния
+- [x] Event replay и projection rebuilding
+- [x] Оптимистичная конкурентность через версионирование
+- [x] Comprehensive документация и примеры
+- [x] Integration с существующими компонентами фреймворка
 
-### Saga Pattern через FSM
-- [ ] Расширенная поддержка Saga Pattern через FSM модуль
-- [ ] Компенсирующие транзакции (compensating transactions)
-- [ ] Saga orchestrator и coordinator
-- [ ] Интеграция с 2PC для распределенных транзакций
+### Cleanup (v1.3.1)
+- [x] Удален нереализованный EventStoreDBAdapter
+- [x] Удален неполный SagaQueryHandler
+- [x] Очищены TODO комментарии в production коде
+
+## In Progress (v1.1.x)
+
+- 🔄 Query Builder for Repositories
+- 🔄 Schema Migrations
+- 🔄 Advanced Indexing
+
+## Planned (v1.2.x+)
+
+- ⏳ EventStoreDB Adapter (pending stable Go client)
+- ⏳ Saga Query Handler with Read Models
+- ⏳ TTL and Change Streams for MongoDB
+- ⏳ Projections and Read Models
 
 ### GraphQL Transport
 - [ ] GraphQL транспорт для запросов
@@ -64,6 +86,31 @@
 - [ ] Best practices guide для production deployments
 
 ## Завершенные задачи
+
+### Версия 1.3.x
+- [x] Saga Pattern полная реализация
+- [x] SagaOrchestrator с автоматической компенсацией
+- [x] SagaStep с forward/compensate actions
+- [x] Persistence через EventStore и PostgreSQL
+- [x] Интеграция с CQRS (CommandBus, QueryBus)
+- [x] Интеграция с EventBus для saga events
+- [x] Интеграция с 2PC координатором
+- [x] Retry механизм с exponential backoff
+- [x] Timeout и cancellation support
+- [x] Comprehensive документация и примеры
+- [x] Order Saga example
+- [x] Warehouse 2PC integration example
+- [x] Полное покрытие unit и integration тестами
+
+### Версия 1.3.0
+- [x] Event Sourcing полная реализация
+- [x] EventStore с адаптерами (InMemory, PostgreSQL, MongoDB, EventStore DB)
+- [x] EventSourcedAggregate с replay механизмом
+- [x] Snapshot механизм с различными стратегиями
+- [x] Event replay и projection rebuilding
+- [x] Оптимистичная конкурентность через версионирование
+- [x] Comprehensive документация и примеры
+- [x] Integration с существующими компонентами фреймворка
 
 ### Версия 1.2.0
 - [x] Интеграция с популярными message brokers (Kafka, Redis)

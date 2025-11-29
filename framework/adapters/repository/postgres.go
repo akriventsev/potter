@@ -54,14 +54,13 @@ func DefaultPostgresConfig() PostgresConfig {
 	}
 }
 
-// PostgresRepository[T Entity] generic PostgreSQL репозиторий
-// NOTE: Текущая реализация покрывает только базовые CRUD операции.
-// Следующие функции планируются, но еще не реализованы:
-// - Query building для сложных запросов
-// - Миграции схемы БД
-// - Индексирование
-// - TTL (Time To Live) для автоматического удаления устаревших записей
-// TODO: Реализовать query builder, migrations, indexing и TTL в последующих версиях
+// PostgresRepository[T Entity] generic PostgreSQL репозиторий.
+// 
+// Current implementation provides basic CRUD operations. Advanced features
+// (query builder, schema migrations, automatic indexing, TTL) are planned for
+// future releases. For complex queries, use raw SQL via GetByID with custom filters.
+// 
+// См. ROADMAP.md для отслеживания прогресса по планируемым улучшениям.
 type PostgresRepository[T Entity] struct {
 	config PostgresConfig
 	db     *pgx.Conn

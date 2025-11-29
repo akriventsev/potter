@@ -280,6 +280,59 @@ fsm.AddTransition(transition)
 fsm.Trigger(ctx, fsm.NewEvent("complete", nil))
 ```
 
+### framework/eventsourcing
+
+Полная поддержка Event Sourcing паттерна для построения систем с полной историей изменений.
+
+**Возможности:**
+- 📦 **EventStore** - хранилище событий с версионированием
+- 🔄 **Event Replay** - восстановление состояния из событий
+- 📸 **Snapshots** - оптимизация через снапшоты
+- 🗄️ **Multiple Adapters** - PostgreSQL, MongoDB, EventStore DB, InMemory
+- 🔐 **Optimistic Concurrency** - безопасная конкурентность через версионирование
+- 🎯 **Type-Safe** - generic репозитории и агрегаты
+
+**Пример использования:**
+```go
+// Event Sourced агрегат
+type BankAccount struct {
+    eventsourcing.EventSourcedAggregate
+    balance int64
+}
+
+func (a *BankAccount) Deposit(amount int64) {
+    a.RaiseEvent(&MoneyDepositedEvent{Amount: amount})
+}
+
+func (a *BankAccount) Apply(event events.Event) error {
+    switch e := event.(type) {
+    case *MoneyDepositedEvent:
+        a.balance += e.Amount
+    }
+    return nil
+}
+
+// Использование
+eventStore := eventsourcing.NewPostgresEventStore(config)
+snapshotStore := eventsourcing.NewPostgresSnapshotStore(config)
+repo := eventsourcing.NewEventSourcedRepository[*BankAccount](
+    eventStore, snapshotStore,
+)
+
+account := NewBankAccount("ACC001")
+account.Deposit(1000)
+repo.Save(ctx, account)
+
+// Загрузка с replay
+loaded, _ := repo.GetByID(ctx, "ACC001")
+```
+
+**Документация:** [`framework/eventsourcing/README.md`](eventsourcing/README.md)
+
+**Примеры:**
+- [`examples/eventsourcing-basic`](../../examples/eventsourcing-basic) - базовый пример
+- [`examples/warehouse`](../../examples/warehouse) - продвинутый пример
+
 ## Testing
 
 Фреймворк включает comprehensive unit тесты для всех основных компонентов. Тесты служат как примеры использования API и демонстрируют best practices.

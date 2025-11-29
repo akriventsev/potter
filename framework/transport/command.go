@@ -4,6 +4,8 @@ package transport
 import (
 	"context"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Command представляет команду CQRS
@@ -78,5 +80,57 @@ func (m *BaseCommandMetadata) CorrelationID() string {
 
 func (m *BaseCommandMetadata) CausationID() string {
 	return m.causationID
+}
+
+// BaseCommand базовая команда с метаданными
+type BaseCommand struct {
+	metadata    CommandMetadata
+	commandName string
+}
+
+// NewBaseCommand создает новую базовую команду с метаданными и именем команды
+// commandName - обязательное имя команды для маршрутизации
+func NewBaseCommand(commandName string, metadata CommandMetadata) *BaseCommand {
+	return &BaseCommand{
+		metadata:    metadata,
+		commandName: commandName,
+	}
+}
+
+// NewBaseCommandSimple создает новую базовую команду с простыми параметрами (для обратной совместимости)
+// Используется в examples для создания команд с именем и aggregateID
+func NewBaseCommandSimple(commandName, aggregateID string) *BaseCommand {
+	metadata := NewBaseCommandMetadata(
+		uuid.New().String(),
+		"",
+		"",
+	)
+	return &BaseCommand{
+		metadata:    metadata,
+		commandName: commandName,
+	}
+}
+
+// Metadata возвращает метаданные команды
+func (c *BaseCommand) Metadata() CommandMetadata {
+	return c.metadata
+}
+
+// CommandName возвращает имя команды
+// Если commandName не установлен, возвращает пустую строку
+// Команды должны переопределить этот метод или установить commandName
+func (c *BaseCommand) CommandName() string {
+	return c.commandName
+}
+
+// NewBaseCommandWithCorrelation создает команду с correlation ID и именем команды
+// commandName - обязательное имя команды для маршрутизации
+func NewBaseCommandWithCorrelation(commandName string, correlationID string) *BaseCommand {
+	metadata := NewBaseCommandMetadata(
+		uuid.New().String(),
+		correlationID,
+		"",
+	)
+	return NewBaseCommand(commandName, metadata)
 }
 

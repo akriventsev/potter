@@ -19,6 +19,15 @@
 - **Queries** - операции чтения (получение данных)
 - **Events** - доменные события, публикуемые после выполнения команд
 
+## Features
+
+- 🔄 **Saga Pattern** - Orchestration долгоживущих транзакций с автоматической компенсацией
+  - Forward и compensating actions
+  - Интеграция с CQRS и EventBus
+  - Persistence через EventStore и PostgreSQL
+  - Retry механизм и timeout support
+  - Интеграция с 2PC для distributed transactions
+
 ## Транспорты
 
 Поддерживаются следующие транспорты:
@@ -29,6 +38,17 @@
 ## Метрики
 
 Отдельный пакет `pkg/metrics` для сбора метрик через OpenTelemetry и Prometheus.
+
+## Production Readiness
+
+| Компонент | Статус | Описание |
+|-----------|--------|----------|
+| Event Sourcing (Postgres/MongoDB) | ✅ Production Ready | Полнофункциональные адаптеры с поддержкой снапшотов и replay |
+| Saga Pattern | ✅ Production Ready | Полная реализация с FSM, компенсацией и persistence |
+| CQRS Invoke | ✅ Production Ready | Type-safe invokers для команд и запросов |
+| Code Generator | ⚠️ Beta | Стабильный API, активная разработка |
+
+Подробнее о планах развития см. [ROADMAP.md](ROADMAP.md).
 
 ## Структура проекта
 
@@ -98,6 +118,46 @@ make proto          # Сгенерировать proto файлы
 ## Examples
 
 Фреймворк включает примеры приложений, демонстрирующие различные возможности. Также см. тесты в каждом пакете как примеры использования API.
+
+### Saga Pattern Examples
+
+- [Order Saga](examples/saga-order/) - Пример Order Saga с резервированием товара, оплатой, доставкой
+- [Warehouse 2PC Integration](examples/saga-warehouse-integration/) - Интеграция Saga с 2PC координатором
+
+### Quick Start: Saga Pattern
+
+```go
+import "potter/framework/saga"
+
+// Определение саги
+sagaDef := saga.NewSagaBuilder("order_saga").
+    AddStep(
+        saga.NewCommandStep(
+            "reserve_inventory",
+            commandBus,
+            ReserveInventoryCommand{...},
+            ReleaseInventoryCommand{...},
+        ),
+    ).
+    AddStep(
+        saga.NewCommandStep(
+            "process_payment",
+            commandBus,
+            ProcessPaymentCommand{...},
+            RefundPaymentCommand{...},
+        ),
+    ).
+    WithPersistence(persistence).
+    WithEventBus(eventBus).
+    Build()
+
+// Создание и выполнение саги
+orchestrator := saga.NewDefaultOrchestrator(persistence, eventBus)
+instance := sagaDef.CreateInstance(sagaContext)
+err := orchestrator.Execute(ctx, instance)
+```
+
+См. [Saga Pattern Documentation](framework/saga/README.md) для подробной информации.
 
 ### Warehouse Example
 

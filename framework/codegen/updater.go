@@ -216,9 +216,9 @@ func (u *CodeUpdater) UpdateMethodSignatures(oldFile, newFile *ParsedFile) error
 			if u.hasSignatureChanged(oldMethod, newMethod) {
 				// Сигнатура изменилась - сохраняем тело из старого метода
 				newMethod.Body = oldMethod.Body
-				// Добавляем TODO комментарий
-				if newMethod.Body != "" && !strings.Contains(newMethod.Body, "TODO") {
-					newMethod.Body = "// TODO: check updated signature\n\t" + newMethod.Body
+				// Добавляем информативный комментарий о изменении сигнатуры
+				if newMethod.Body != "" && !strings.Contains(newMethod.Body, "GENERATED:") {
+					newMethod.Body = "// GENERATED: Method signature was updated. Please review the implementation.\n\t" + newMethod.Body
 				}
 			} else {
 				// Сигнатура не изменилась - сохраняем тело

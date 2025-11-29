@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: eventsourcing-mongodb-mongo
+    environment:
+      MONGO_INITDB_DATABASE: eventsourcing_mongodb
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - mongodb-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_data:
+
+networks:
+  mongodb-net:
+    driver: bridge
+

@@ -1,4 +1,4 @@
-.PHONY: test test-coverage test-unit test-integration lint clean deps example-warehouse example-warehouse-docker help
+.PHONY: test test-coverage test-unit test-integration lint clean deps example-warehouse example-warehouse-docker help example-eventsourcing-basic example-eventsourcing-docker example-eventsourcing-migrate test-eventsourcing benchmark-eventsourcing test-all example-saga-order example-saga-order-test example-saga-warehouse test-saga test-saga-integration benchmark-saga
 
 # Тестирование
 test:
@@ -81,6 +81,56 @@ clean-codegen:
 	@echo "Cleaning generated code..."
 	@rm -rf examples/codegen/generated/
 
+# Event Sourcing Examples
+example-eventsourcing-basic:
+	@echo "Running Event Sourcing basic example..."
+	@cd examples/eventsourcing-basic && make run
+
+example-eventsourcing-docker:
+	@echo "Starting Event Sourcing example infrastructure..."
+	@cd examples/eventsourcing-basic && make docker-up
+
+example-eventsourcing-migrate:
+	@echo "Running Event Sourcing migrations..."
+	@cd examples/eventsourcing-basic && make migrate
+
+test-eventsourcing:
+	@echo "Running Event Sourcing tests..."
+	@go test -v ./framework/eventsourcing/...
+
+benchmark-eventsourcing:
+	@echo "Running Event Sourcing benchmarks..."
+	@go test -bench=. -benchmem ./framework/eventsourcing/...
+
+# Все тесты включая Event Sourcing
+test-all: test test-eventsourcing test-saga
+	@echo "All tests completed"
+
+# Saga Pattern examples
+example-saga-order:
+	@echo "Running Order Saga example..."
+	@cd examples/saga-order && make docker-up && make migrate && make run
+
+example-saga-order-test:
+	@echo "Testing Order Saga example..."
+	@cd examples/saga-order && make test
+
+example-saga-warehouse:
+	@echo "Running Warehouse Saga integration example..."
+	@cd examples/saga-warehouse-integration && make docker-up && make migrate && make run
+
+test-saga:
+	@echo "Testing Saga module..."
+	@go test -v -race -coverprofile=coverage-saga.out ./framework/saga/...
+
+test-saga-integration:
+	@echo "Running Saga integration tests..."
+	@go test -v -tags=integration ./framework/saga/...
+
+benchmark-saga:
+	@echo "Running Saga benchmarks..."
+	@go test -bench=. -benchmem ./framework/saga/...
+
 # Вывод справки
 help:
 	@echo "Available commands:"
@@ -88,15 +138,27 @@ help:
 	@echo "  make test-coverage           - Run tests with coverage report"
 	@echo "  make test-unit               - Run unit tests only"
 	@echo "  make test-integration        - Run integration tests"
+	@echo "  make test-all                - Run all tests including Event Sourcing"
 	@echo "  make lint                    - Run linter"
 	@echo "  make clean                   - Clean build artifacts"
 	@echo "  make deps                    - Install dependencies"
 	@echo "  make example-warehouse      - Run warehouse example"
 	@echo "  make example-warehouse-docker - Start warehouse infrastructure"
+	@echo "  make example-eventsourcing-basic - Run Event Sourcing basic example"
+	@echo "  make example-eventsourcing-docker - Start Event Sourcing infrastructure"
+	@echo "  make example-eventsourcing-migrate - Run Event Sourcing migrations"
+	@echo "  make test-eventsourcing      - Run Event Sourcing tests"
+	@echo "  make benchmark-eventsourcing - Run Event Sourcing benchmarks"
 	@echo "  make install-codegen-tools   - Install potter-gen and protoc-gen-potter"
 	@echo "  make test-codegen            - Test code generator"
 	@echo "  make example-codegen         - Run codegen example"
 	@echo "  make clean-codegen           - Clean generated code"
+	@echo "  make example-saga-order     - Run Order Saga example"
+	@echo "  make example-saga-order-test - Test Order Saga example"
+	@echo "  make example-saga-warehouse - Run Warehouse Saga integration example"
+	@echo "  make test-saga               - Test Saga module"
+	@echo "  make test-saga-integration   - Run Saga integration tests"
+	@echo "  make benchmark-saga          - Run Saga benchmarks"
 	@echo "  make help                    - Show this help message"
 
 
