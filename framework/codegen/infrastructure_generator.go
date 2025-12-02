@@ -134,7 +134,7 @@ func (g *InfrastructureGenerator) generateRepository(agg AggregateSpec, config *
 	updates = append(updates, fmt.Sprintf("updated_at = $%d", updatedAtIdx))
 
 	queryTemplate := "\tquery := fmt.Sprintf(`\n" +
-		"\t\tINSERT INTO %%s (" + strings.Join(insertFields, ", ") + ") \n" +
+		"\t\tINSERT INTO %s (" + strings.Join(insertFields, ", ") + ") \n" +
 		"\t\tVALUES (" + strings.Join(insertPlaceholders, ", ") + ")\n" +
 		"\t\tON CONFLICT (id) \n" +
 		"\t\tDO UPDATE SET " + strings.Join(updates, ", ") + "\n" +
@@ -176,7 +176,7 @@ func (g *InfrastructureGenerator) generateRepository(agg AggregateSpec, config *
 	}
 	selectFields = append(selectFields, "created_at", "updated_at")
 	content.WriteString(strings.Join(selectFields, ", "))
-	content.WriteString(fmt.Sprintf(" FROM %%s WHERE id = $1\", r.table)\n\n"))
+	content.WriteString(fmt.Sprintf(" FROM %s WHERE id = $1\", r.table)\n\n"))
 
 	// Генерируем объявления переменных с правильными переносами
 	for _, field := range agg.Fields {
@@ -217,7 +217,7 @@ func (g *InfrastructureGenerator) generateRepository(agg AggregateSpec, config *
 	// Delete метод
 	content.WriteString(fmt.Sprintf("// Delete удаляет %s + инвалидация кеша\n", strings.ToLower(agg.Name)))
 	content.WriteString(fmt.Sprintf("func (r *%s) Delete(ctx context.Context, id string) error {\n", repoName))
-	content.WriteString(fmt.Sprintf("\tquery := fmt.Sprintf(\"DELETE FROM %%s WHERE id = $1\", r.table)\n\n"))
+	content.WriteString(fmt.Sprintf("\tquery := fmt.Sprintf(\"DELETE FROM %s WHERE id = $1\", r.table)\n\n"))
 	content.WriteString("\tresult, err := r.db.Exec(ctx, query, id)\n")
 	content.WriteString("\tif err != nil {\n")
 	content.WriteString(fmt.Sprintf("\t\treturn fmt.Errorf(\"failed to delete %s: %%w\", err)\n", strings.ToLower(agg.Name)))

@@ -752,7 +752,24 @@ func runCommand(dir, name string, args ...string) error {
 }
 
 // initializeGoModules инициализирует Go модули после генерации кода
+// Если potterImportPath передан явно (не равен defaultPotterImportPath), 
+// не вызывает go get, оставляя пользователю возможность выполнить make deps.
+// Неуспешный go get не считается критической ошибкой - возвращает предупреждение.
 func initializeGoModules(outputDir, potterImportPath string) error {
+	// Если путь передан явно и отличается от дефолтного, пропускаем автоматический go get
+	if potterImportPath != defaultPotterImportPath {
+		fmt.Printf("Potter import path explicitly set to: %s\n", potterImportPath)
+		fmt.Printf("Skipping automatic 'go get'. Please run 'make deps' manually if needed.\n")
+		// Выполняем только go mod tidy для разрешения зависимостей
+		fmt.Println("Running: go mod tidy")
+		if err := runCommand(outputDir, "go", "mod", "tidy"); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to run 'go mod tidy': %v\n", err)
+			fmt.Fprintf(os.Stderr, "Please run 'make deps' manually to initialize dependencies.\n")
+			return nil // Не прерываем генерацию
+		}
+		return nil
+	}
+	
 	// Извлекаем базовый путь без версии для использования в импортах
 	baseImportPath := strings.Split(potterImportPath, "@")[0]
 	
@@ -770,14 +787,22 @@ func initializeGoModules(outputDir, potterImportPath string) error {
 	fmt.Printf("Initializing Go modules in %s...\n", outputDir)
 	fmt.Printf("Running: go get %s\n", goGetPath)
 	if err := runCommand(outputDir, "go", "get", goGetPath); err != nil {
-		return fmt.Errorf("failed to run 'go get %s': %w", goGetPath, err)
+		// Неуспешный go get не считается критической ошибкой
+		fmt.Fprintf(os.Stderr, "Warning: failed to run 'go get %s': %v\n", goGetPath, err)
+		fmt.Fprintf(os.Stderr, "This usually happens when Potter framework cannot be fetched from GitHub.\n")
+		fmt.Fprintf(os.Stderr, "Please run manually: cd %s && make deps\n", outputDir)
+		fmt.Fprintf(os.Stderr, "Or: cd %s && go get %s && go mod tidy\n", outputDir, goGetPath)
+		// Продолжаем выполнение - не прерываем генерацию
+	} else {
+		fmt.Printf("Successfully fetched Potter framework from %s\n", goGetPath)
 	}
-	fmt.Printf("Successfully fetched Potter framework from %s\n", goGetPath)
-	fmt.Println("Running: go mod tidy")
 	
+	fmt.Println("Running: go mod tidy")
 	// Выполняем go mod tidy для разрешения всех зависимостей
 	if err := runCommand(outputDir, "go", "mod", "tidy"); err != nil {
-		return fmt.Errorf("failed to run 'go mod tidy': %w", err)
+		fmt.Fprintf(os.Stderr, "Warning: failed to run 'go mod tidy': %v\n", err)
+		fmt.Fprintf(os.Stderr, "Please run 'make deps' manually to initialize dependencies.\n")
+		return nil // Не прерываем генерацию
 	}
 	
 	return nil

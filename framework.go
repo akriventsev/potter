@@ -35,9 +35,9 @@ import (
 // Version представляет версию фреймворка
 // ВАЖНО: Версия должна соответствовать файлу VERSION в корне проекта
 const (
-	Version = "1.2.0"
+	Version = "1.5.0"
 	Major   = 1
-	Minor   = 2
+	Minor   = 5
 	Patch   = 0
 )
 
@@ -60,7 +60,6 @@ func GetMetadata() Metadata {
 		License:     "MIT",
 	}
 }
-
 
 // Framework основной интерфейс фреймворка
 type Framework interface {
@@ -129,4 +128,3 @@ func (f *BaseFramework) RegisterComponent(component core.Component) error {
 func FrameworkVersion() string {
 	return Version
 }
-

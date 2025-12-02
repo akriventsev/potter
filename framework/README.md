@@ -52,10 +52,14 @@ Potter Framework предоставляет полный набор компон
 
 ### Установка
 
-**Примечание**: Путь `potter` используется для локальной разработки. При публикации на GitHub путь модуля можно изменить на `github.com/username/potter`.
-
 ```bash
-go get potter/framework
+go get github.com/akriventsev/potter/framework
+```
+
+**Примечание для локальной разработки**: Если вы работаете с форком или локальной версией фреймворка, используйте `replace` директиву в `go.mod`:
+
+```go
+replace github.com/akriventsev/potter => /path/to/local/potter
 ```
 
 ### Базовый пример

@@ -121,18 +121,24 @@
 
   - Projections: все примеры используют projection framework
 
-## Planned (v1.2.x+)
+## Planned (v1.6.0+)
 
-- ⏳ EventStoreDB Adapter (pending stable Go client v21.2+)
-  - Базовая реализация готова в `framework/eventsourcing/eventstoredb_store.go` (249 строк кода с полной структурой), ожидает интеграции со стабильным официальным Go client
-  - Требуется стабильная версия официального Go client
-  - Comprehensive тесты с testcontainers
+- ⏳ **EventStoreDB Adapter** (экспериментальный, не готов к production)
+  - ⚠️ **СТАТУС**: Экспериментальный плейсхолдер, не готов к production использованию
+  - Базовая структура готова в `framework/eventsourcing/eventstoredb_store.go`, но требует интеграции со стабильным официальным Go client
+  - Все методы возвращают ошибку "EventStoreDB adapter not fully implemented - requires stable Go client"
+  - Блокирующий фактор: отсутствие стабильной версии официального Go client для EventStoreDB
+  - После появления стабильного клиента потребуется:
+    - Интеграция с официальным Go client
+    - Comprehensive тесты с testcontainers
+    - Обновление документации и примеров
 
-### GraphQL Transport ✅
+### GraphQL Transport ✅ (v1.4.0)
 - ✅ GraphQL транспорт для запросов
 - ✅ Автоматическая генерация GraphQL схем из proto
 - ✅ GraphQL subscriptions для real-time обновлений
 - ✅ Интеграция с существующими GraphQL серверами
+- ⚠️ Требуется стабилизация и улучшение DX для production использования
 
 ## Версия 1.6.0 (Планируется)
 
@@ -189,11 +195,20 @@
 
 ## Приоритеты
 
-1. **Высокий приоритет**: OpenAPI генерация
-   - GraphQL Transport реализован в v1.4.0
-   - Event Sourcing и Saga Pattern полностью реализованы в v1.4.0
-2. **Средний приоритет**: Расширенный distributed tracing
-3. **Низкий приоритет**: WebAssembly, multi-tenancy, serverless support
+1. **Высокий приоритет** (v1.6.0):
+   - Стабилизация GraphQL транспорта и доведение до production-ready состояния
+   - Доведение кодогенератора до действительно production-ready состояния
+   - Улучшение observability и DX (developer experience)
+   - OpenAPI генерация из proto файлов
+
+2. **Средний приоритет** (v1.7.0+):
+   - Расширенный distributed tracing с интеграцией Jaeger, Zipkin, Datadog
+   - Улучшения производительности (connection pooling, batch processing, оптимизация сериализации)
+
+3. **Низкий приоритет** (v2.0+):
+   - WebAssembly поддержка для edge computing
+   - Multi-tenancy на уровне фреймворка
+   - Serverless deployment support (AWS Lambda, Google Cloud Functions)
 
 ## Обратная связь
 

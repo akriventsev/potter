@@ -65,7 +65,8 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	// Удаляем @main или другие суффиксы версии для import-путей
 	baseImportPath := strings.Split(potterPath, "@")[0]
 	content.WriteString(fmt.Sprintf("\t\"%s/framework/events\"\n", baseImportPath))
-	content.WriteString(fmt.Sprintf("\t\"%s/framework/invoke\"\n", baseImportPath))
+	// Импорты invoke и time добавляются только если они используются в закомментированном коде
+	// Они будут добавлены пользователем при раскомментировании кода сохранения и публикации событий
 	content.WriteString(fmt.Sprintf("\t\"%s/framework/transport\"\n", baseImportPath))
 	content.WriteString(")\n\n")
 
@@ -104,10 +105,13 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	content.WriteString("}\n\n")
 
 	content.WriteString(fmt.Sprintf("func (h *%s) Handle(ctx context.Context, cmd transport.Command) error {\n", handlerName))
-	content.WriteString(fmt.Sprintf("\t%s, ok := cmd.(%s)\n", strings.ToLower(cmd.Name), cmdName))
+	content.WriteString(fmt.Sprintf("\t_, ok := cmd.(%s)\n", cmdName))
 	content.WriteString("\tif !ok {\n")
 	content.WriteString(fmt.Sprintf("\t\treturn fmt.Errorf(\"invalid command type: %%T\", cmd)\n"))
 	content.WriteString("\t}\n\n")
+	content.WriteString(fmt.Sprintf("\t// Переменная команды будет доступна после раскомментирования кода ниже\n"))
+	content.WriteString(fmt.Sprintf("\t// %s := cmd.(%s)\n", strings.ToLower(cmd.Name), cmdName))
+	content.WriteString("\n")
 
 	content.WriteString("// USER CODE BEGIN: Validation\n")
 	content.WriteString("// Add validation logic here\n")
@@ -199,7 +203,10 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	content.WriteString("import (\n")
 	content.WriteString("\t\"context\"\n")
 	content.WriteString("\t\"fmt\"\n")
-	content.WriteString("\t\"time\"\n")
+	// Импорт time добавляется только если query cacheable
+	if query.Cacheable {
+		content.WriteString("\t\"time\"\n")
+	}
 	content.WriteString("\n")
 	if usesDomain {
 		content.WriteString(fmt.Sprintf("\t\"%s/domain\"\n", config.ModulePath))
@@ -265,14 +272,14 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 			}
 		}
 	}
-	
+
 	if query.Cacheable {
 		content.WriteString("\tcache cache.CacheService\n")
 	}
 	content.WriteString("}\n\n")
 
 	content.WriteString(fmt.Sprintf("// New%s создает новый обработчик\n", handlerName))
-	
+
 	// Генерируем конструктор в зависимости от наличия read_model и агрегата
 	if hasReadModel {
 		// Query имеет read_model - параметры: только cache (если cacheable)
@@ -293,7 +300,7 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 			// Агрегат найден в спецификации - добавляем параметр репозитория
 			repoName := fmt.Sprintf("%sRepository", foundAggregate.Name)
 			repoVarName := strings.ToLower(foundAggregate.Name) + "Repo"
-			
+
 			content.WriteString(fmt.Sprintf("func New%s(%s domain.%s", handlerName, repoVarName, repoName))
 			if query.Cacheable {
 				content.WriteString(", cache cache.CacheService")
@@ -328,18 +335,24 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	}
 
 	content.WriteString(fmt.Sprintf("func (h *%s) Handle(ctx context.Context, q transport.Query) (interface{}, error) {\n", handlerName))
-	content.WriteString(fmt.Sprintf("\t%s, ok := q.(%s)\n", strings.ToLower(query.Name), queryName))
+	content.WriteString(fmt.Sprintf("\t_, ok := q.(%s)\n", queryName))
 	content.WriteString("\tif !ok {\n")
 	content.WriteString("\t\treturn nil, fmt.Errorf(\"invalid query type: %T\", q)\n")
 	content.WriteString("\t}\n\n")
+	content.WriteString(fmt.Sprintf("\t// Переменная запроса будет доступна после раскомментирования кода ниже\n"))
+	content.WriteString(fmt.Sprintf("\t// %s := q.(%s)\n", strings.ToLower(query.Name), queryName))
+	content.WriteString("\n")
 
 	if query.Cacheable {
 		content.WriteString("\t// Попытка получить из кеша\n")
-		content.WriteString(fmt.Sprintf("\t// TODO: Customize cache key based on query parameters\n"))
-		content.WriteString(fmt.Sprintf("\tcacheKey := fmt.Sprintf(\"%s:%%v\", %s)\n",
+		content.WriteString("\t// TODO: Customize cache key based on query parameters\n")
+		content.WriteString("\t// Раскомментируйте переменную запроса выше и используйте её для формирования cache key:\n")
+		content.WriteString(fmt.Sprintf("\t// cacheKey := fmt.Sprintf(\"%s:%%v\", %s)\n",
 			g.converter.ToSnakeCase(query.Name), strings.ToLower(query.Name)))
 		content.WriteString(fmt.Sprintf("\t// Example with specific field: cacheKey := fmt.Sprintf(\"%s:%%s\", %s.ID)\n",
 			g.converter.ToSnakeCase(query.Name), strings.ToLower(query.Name)))
+		content.WriteString("\t// Временный cache key для примера (замените на реальный после раскомментирования переменной запроса):\n")
+		content.WriteString(fmt.Sprintf("\tcacheKey := fmt.Sprintf(\"%s:placeholder\")\n", g.converter.ToSnakeCase(query.Name)))
 		content.WriteString(fmt.Sprintf("\tvar response %s\n", responseName))
 		content.WriteString("\texists, err := h.cache.Get(ctx, cacheKey, &response)\n")
 		content.WriteString("\tif err == nil && exists {\n")
@@ -387,28 +400,28 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 func inferAggregateFromQueryName(queryName string) string {
 	// Список известных префиксов для удаления
 	prefixes := []string{"List", "Get", "Find", "Search", "Fetch", "Retrieve", "Query"}
-	
+
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(queryName, prefix) {
 			remaining := queryName[len(prefix):]
 			if remaining == "" {
 				return ""
 			}
-			
+
 			// Обработка множественного числа: Items -> Item, Users -> User
 			if len(remaining) > 1 && strings.HasSuffix(remaining, "s") {
 				return remaining[:len(remaining)-1]
 			}
-			
+
 			return remaining
 		}
 	}
-	
+
 	// Если префикс не найден, возвращаем имя как есть (с обработкой множественного числа)
 	if len(queryName) > 1 && strings.HasSuffix(queryName, "s") {
 		return queryName[:len(queryName)-1]
 	}
-	
+
 	return queryName
 }
 

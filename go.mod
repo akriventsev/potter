@@ -18,14 +18,14 @@ require (
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.44.0
 	go.opentelemetry.io/otel/metric v1.37.0
-	go.opentelemetry.io/otel/sdk/metric v1.21.0
+	go.opentelemetry.io/otel/sdk/metric v1.37.0
 	google.golang.org/grpc v1.62.1
 )
 
 require (
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/stretchr/testify v1.11.0
-	go.opentelemetry.io/otel/sdk v1.21.0
+	go.opentelemetry.io/otel/sdk v1.37.0
 	google.golang.org/protobuf v1.34.1
 )
 

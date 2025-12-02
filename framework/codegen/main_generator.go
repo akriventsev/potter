@@ -113,6 +113,10 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 	baseImportPath := strings.Split(potterPath, "@")[0]
 	content.WriteString(fmt.Sprintf("\tadapterevents \"%s/framework/adapters/events\"\n", baseImportPath))
 	content.WriteString(fmt.Sprintf("\t\"%s/framework/adapters/messagebus\"\n", baseImportPath))
+	if hasGraphQL {
+		content.WriteString(fmt.Sprintf("\tgraphqltransport \"%s/framework/adapters/transport\"\n", baseImportPath))
+	}
+	content.WriteString(fmt.Sprintf("\t\"%s/framework/events\"\n", baseImportPath))
 	content.WriteString(fmt.Sprintf("\t\"%s/framework/metrics\"\n", baseImportPath))
 	content.WriteString(fmt.Sprintf("\t\"%s/framework/transport\"\n", baseImportPath))
 	content.WriteString(")\n\n")
@@ -179,7 +183,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 	}
 	content.WriteString("\n")
 
-	// Создание EventPublisher
+	// Создание EventPublisher и EventBus
 	content.WriteString("\t// Создание EventPublisher\n")
 	content.WriteString("\teventConfig := adapterevents.NATSEventConfig{\n")
 	content.WriteString("\t\tConn:          natsAdapter.Conn(),\n")
@@ -193,6 +197,18 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 	content.WriteString("\t\tlog.Fatalf(\"Failed to start event publisher: %v\", err)\n")
 	content.WriteString("\t}\n")
 	content.WriteString("\tdefer eventPublisher.Stop(ctx)\n\n")
+	content.WriteString("\t// Создание EventBus для GraphQL subscriptions\n")
+	content.WriteString("\t// EventBus объединяет EventPublisher и EventSubscriber\n")
+	content.WriteString("\t// Для GraphQL адаптера нужен полный EventBus интерфейс\n")
+	if hasGraphQL {
+		content.WriteString("\teventBus := events.NewInMemoryEventBus()\n")
+		content.WriteString("\t// Адаптируем NATS EventPublisher к EventBus через middleware\n")
+		content.WriteString("\t// События из NATS будут публиковаться в InMemoryEventBus для subscriptions\n")
+		content.WriteString("\t// В production можно использовать более продвинутый адаптер\n")
+	} else {
+		content.WriteString("\tvar eventBus events.EventBus\n")
+	}
+	content.WriteString("\n")
 
 	// Создание CommandBus и QueryBus
 	content.WriteString("\t// Создание CommandBus и QueryBus\n")
@@ -208,7 +224,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 			strings.ToLower(handlerName), cmd.Name, aggName))
 		content.WriteString(fmt.Sprintf("\tif err := commandBus.Register(%s); err != nil {\n",
 			strings.ToLower(handlerName)))
-		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %%v\", err)\n", cmd.Name))
+		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %v\", err)\n", cmd.Name))
 		content.WriteString("\t}\n")
 	}
 	content.WriteString("\n")
@@ -261,7 +277,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 
 		content.WriteString(fmt.Sprintf("\tif err := queryBus.Register(%s); err != nil {\n",
 			strings.ToLower(handlerName)))
-		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %%v\", err)\n", query.Name))
+		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %v\", err)\n", query.Name))
 		content.WriteString("\t}\n")
 	}
 	content.WriteString("\n")
@@ -270,7 +286,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 	content.WriteString("\t// Инициализация транспортов\n")
 	content.WriteString("\tvar restServer *http.Server\n")
 	if hasGraphQL {
-		content.WriteString("\tvar graphQLAdapter *transport.GraphQLAdapter\n")
+		content.WriteString("\tvar graphQLAdapter *graphqltransport.GraphQLAdapter\n")
 	}
 	content.WriteString("\n")
 
@@ -283,13 +299,13 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 		content.WriteString("\trestHandler.RegisterRoutes(router)\n\n")
 		content.WriteString("\t// Запуск REST HTTP сервера\n")
 		content.WriteString("\trestServer = &http.Server{\n")
-		content.WriteString("\t\tAddr:    fmt.Sprintf(\":%%d\", cfg.Server.Port),\n")
+		content.WriteString("\t\tAddr:    fmt.Sprintf(\":%d\", cfg.Server.Port),\n")
 		content.WriteString("\t\tHandler: router,\n")
 		content.WriteString("\t}\n\n")
 		content.WriteString("\tgo func() {\n")
-		content.WriteString("\t\tlog.Printf(\"REST server starting on port %%d\", cfg.Server.Port)\n")
+		content.WriteString("\t\tlog.Printf(\"REST server starting on port %d\", cfg.Server.Port)\n")
 		content.WriteString("\t\tif err := restServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {\n")
-		content.WriteString("\t\t\tlog.Fatalf(\"Failed to start REST server: %%v\", err)\n")
+		content.WriteString("\t\t\tlog.Fatalf(\"Failed to start REST server: %v\", err)\n")
 		content.WriteString("\t\t}\n")
 		content.WriteString("\t}()\n\n")
 	}
@@ -312,18 +328,18 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 		content.WriteString("\t\tlog.Println(\"Warning: executableSchema is not initialized. Skipping GraphQL adapter creation.\")\n")
 		content.WriteString("\t\tlog.Println(\"To enable GraphQL, initialize executableSchema using gqlgen-generated code.\")\n")
 		content.WriteString("\t} else {\n")
-		content.WriteString("\t\tgraphQLAdapter, err = graphqladapter.NewGraphQLAdapter(cfg, commandBus, queryBus, eventPublisher, executableSchema)\n")
+		content.WriteString("\t\tgraphQLAdapter, err = graphqladapter.NewGraphQLAdapter(cfg, commandBus, queryBus, eventBus, executableSchema)\n")
 		content.WriteString("\t\tif err != nil {\n")
-		content.WriteString("\t\t\tlog.Fatalf(\"Failed to create GraphQL adapter: %%v\", err)\n")
+		content.WriteString("\t\t\tlog.Fatalf(\"Failed to create GraphQL adapter: %v\", err)\n")
 		content.WriteString("\t\t}\n\n")
 		content.WriteString("\t\t// Запуск GraphQL сервера\n")
 		content.WriteString("\t\tif err := graphQLAdapter.Start(ctx); err != nil {\n")
-		content.WriteString("\t\t\tlog.Fatalf(\"Failed to start GraphQL adapter: %%v\", err)\n")
+		content.WriteString("\t\t\tlog.Fatalf(\"Failed to start GraphQL adapter: %v\", err)\n")
 		content.WriteString("\t\t}\n")
 		content.WriteString("\t\tdefer graphQLAdapter.Stop(ctx)\n\n")
-		content.WriteString("\t\tlog.Printf(\"GraphQL server started on port %%d\", cfg.GraphQL.Port)\n")
+		content.WriteString("\t\tlog.Printf(\"GraphQL server started on port %d\", cfg.GraphQL.Port)\n")
 		content.WriteString("\t\tif cfg.GraphQL.EnablePlayground {\n")
-		content.WriteString("\t\t\tlog.Printf(\"GraphQL Playground: http://localhost:%%d/graphql\", cfg.GraphQL.Port)\n")
+		content.WriteString("\t\t\tlog.Printf(\"GraphQL Playground: http://localhost:%d/graphql\", cfg.GraphQL.Port)\n")
 		content.WriteString("\t\t}\n\n")
 		content.WriteString("\t}\n\n")
 	}
@@ -347,7 +363,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 		content.WriteString("\t// Остановка REST сервера\n")
 		content.WriteString("\tif restServer != nil {\n")
 		content.WriteString("\t\tif err := restServer.Shutdown(shutdownCtx); err != nil {\n")
-		content.WriteString("\t\t\tlog.Printf(\"Error during REST server shutdown: %%v\", err)\n")
+		content.WriteString("\t\t\tlog.Printf(\"Error during REST server shutdown: %v\", err)\n")
 		content.WriteString("\t\t}\n")
 		content.WriteString("\t}\n\n")
 	}
@@ -356,7 +372,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 		content.WriteString("\t// Остановка GraphQL сервера\n")
 		content.WriteString("\tif graphQLAdapter != nil {\n")
 		content.WriteString("\t\tif err := graphQLAdapter.Stop(shutdownCtx); err != nil {\n")
-		content.WriteString("\t\t\tlog.Printf(\"Error during GraphQL server shutdown: %%v\", err)\n")
+		content.WriteString("\t\t\tlog.Printf(\"Error during GraphQL server shutdown: %v\", err)\n")
 		content.WriteString("\t\t}\n")
 		content.WriteString("\t}\n\n")
 	}
@@ -432,6 +448,9 @@ clean:
 	@rm -rf bin/
 
 # Инициализация зависимостей
+# Примечание: При работе с форками/зеркалами нужно переопределить POTTER_IMPORT_PATH.
+# Если POTTER_IMPORT_PATH содержит явную версию (например, @v1.5.0), она используется как есть.
+# Если версия не указана, автоматически добавляется @main.
 deps:
 	@echo "Initializing Go modules..."
 	@go get $(POTTER_IMPORT_PATH)
@@ -596,10 +615,10 @@ require (
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/nats-io/nats.go v1.31.0
 	github.com/redis/go-redis/v9 v9.3.0
-	go.opentelemetry.io/otel v1.21.0
+	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.44.0
-	go.opentelemetry.io/otel/metric v1.21.0
-	go.opentelemetry.io/otel/sdk/metric v1.21.0
+	go.opentelemetry.io/otel/metric v1.37.0
+	go.opentelemetry.io/otel/sdk/metric v1.37.0
 )
 
 // Potter framework будет добавлен автоматически при инициализации модулей через 'go get @main'.

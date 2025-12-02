@@ -40,11 +40,29 @@ func DefaultEventStoreDBConfig() EventStoreDBConfig {
 }
 
 // EventStoreDBStore реализация EventStore для EventStoreDB
-// 
-// Примечание: Реализация зависит от стабильности официального Go client для EventStoreDB.
-// На момент реализации необходимо проверить статус клиента (https://github.com/EventStore/EventStore-Client-Go).
-// 
-// Базовая структура готова, но требует интеграции с официальным клиентом.
+//
+// ⚠️ ВНИМАНИЕ: ЭКСПЕРИМЕНТАЛЬНЫЙ КОД - НЕ ГОТОВ К PRODUCTION ИСПОЛЬЗОВАНИЮ
+//
+// Данный адаптер является плейсхолдером и не готов к использованию в production окружении.
+// Все методы возвращают ошибку "EventStoreDB adapter not fully implemented - requires stable Go client".
+//
+// Текущий статус:
+//   - Базовая структура адаптера реализована
+//   - Конфигурация и валидация готовы
+//   - Все методы EventStore интерфейса имеют заглушки с TODO комментариями
+//   - Интеграция с официальным Go client для EventStoreDB не завершена
+//
+// Блокирующий фактор:
+//   - Отсутствие стабильной версии официального Go client для EventStoreDB
+//   - Требуется проверка статуса клиента: https://github.com/EventStore/EventStore-Client-Go
+//
+// После появления стабильного клиента потребуется:
+//   - Интеграция с официальным Go client
+//   - Реализация всех методов EventStore интерфейса
+//   - Comprehensive тесты с testcontainers
+//   - Обновление документации и примеров
+//
+// Использование данного адаптера в production не рекомендуется до завершения интеграции.
 type EventStoreDBStore struct {
 	config       EventStoreDBConfig
 	deserializer EventDeserializer
@@ -53,17 +71,32 @@ type EventStoreDBStore struct {
 }
 
 // NewEventStoreDBStore создает новый EventStoreDB Store
+//
+// ⚠️ ВНИМАНИЕ: ЭКСПЕРИМЕНТАЛЬНЫЙ КОД - НЕ ГОТОВ К PRODUCTION ИСПОЛЬЗОВАНИЮ
+//
+// Данная функция создает плейсхолдер адаптера, который не готов к использованию.
+// Все методы адаптера будут возвращать ошибки при попытке использования.
+//
+// Использование в production не рекомендуется до завершения интеграции с официальным Go client.
 func NewEventStoreDBStore(config EventStoreDBConfig) (*EventStoreDBStore, error) {
 	return NewEventStoreDBStoreWithDeserializer(config, nil)
 }
 
 // NewEventStoreDBStoreWithDeserializer создает новый EventStoreDB Store с десериализатором
+//
+// ⚠️ ВНИМАНИЕ: ЭКСПЕРИМЕНТАЛЬНЫЙ КОД - НЕ ГОТОВ К PRODUCTION ИСПОЛЬЗОВАНИЮ
+//
+// Данная функция создает плейсхолдер адаптера, который не готов к использованию.
+// Все методы адаптера будут возвращать ошибки при попытке использования.
+//
+// Использование в production не рекомендуется до завершения интеграции с официальным Go client.
 func NewEventStoreDBStoreWithDeserializer(config EventStoreDBConfig, deserializer EventDeserializer) (*EventStoreDBStore, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid eventstoredb config: %w", err)
 	}
 
 	// TODO: Инициализация клиента EventStoreDB после интеграции с официальным клиентом
+	// Блокирующий фактор: отсутствие стабильной версии официального Go client
 	// settings, err := esdb.ParseConnectionString(config.ConnectionString)
 	// if err != nil {
 	//     return nil, fmt.Errorf("failed to parse connection string: %w", err)
