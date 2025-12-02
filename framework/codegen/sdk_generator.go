@@ -483,10 +483,8 @@ func (g *SDKGenerator) generateSDKGoMod(_ *ParsedSpec, config *GeneratorConfig) 
 go 1.25.0
 
 require (
-	potter v0.0.0
+	github.com/akriventsev/potter v0.0.0
 )
-
-replace potter => ../..
 `, sdkModulePath)
 
 	return g.writer.WriteFile("sdk/go.mod", content)

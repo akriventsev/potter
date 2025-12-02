@@ -228,7 +228,7 @@ make playground  # Открыть GraphQL Playground
 
 ```protobuf
 syntax = "proto3";
-import "github.com/akriventsev/potter/options.proto";
+import "potter/options.proto";
 
 service ProductService {
   option (potter.service) = {

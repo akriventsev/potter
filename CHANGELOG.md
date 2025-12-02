@@ -5,6 +5,27 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и этот проект придерживается [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Fixed
+
+- Исправлена ошибка "Input is shadowed in the --proto_path" при генерации кода из proto файлов
+- Улучшена логика вызова protoc для корректной обработки путей к proto файлам
+
+### Added
+
+- Автоматическая генерация GraphQL транспорта из proto спецификаций
+- Поддержка множественных транспортов через поле `transport` в proto options
+- Интеграция GraphQL с Potter CQRS (CommandBus, QueryBus, EventBus)
+- Автоматическая генерация GraphQL схемы, резолверов и subscriptions
+- Генерация GraphQL адаптера с настройкой Playground и Introspection
+
+### Changed
+
+- Удален флаг `--with-graphql` из potter-gen CLI (GraphQL теперь активируется через proto options)
+- Рефакторинг PresentationGenerator для поддержки множественных транспортов
+- Обновлена генерация main.go для автоматической инициализации указанных транспортов
+
 ## [1.5.0] - 2025-XX-XX
 
 ### Added

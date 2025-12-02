@@ -6,6 +6,21 @@ import "google/protobuf/descriptor.proto";
 
 option go_package = "github.com/akriventsev/potter/api/proto/potter";
 
+// Рекомендуемый способ импорта этого файла в ваших proto файлах:
+// import "potter/options.proto";
+//
+// При использовании potter-gen, путь к этому файлу определяется автоматически.
+// Для нестандартных установок можно использовать переменную окружения POTTER_PROTO_PATH.
+//
+// ПРАВИЛЬНО:
+// import "potter/options.proto";
+//
+// НЕПРАВИЛЬНО (не используйте):
+// import "github.com/akriventsev/potter/options.proto";
+//
+// Важно: protoc ищет файлы относительно --proto_path, а не по полному пути модуля Go.
+// Potter-gen автоматически настраивает пути для поиска potter/options.proto.
+
 // Potter custom options для аннотации CQRS компонентов
 
 // CommandOptions аннотация для RPC метода, представляющего Command
@@ -85,6 +100,9 @@ message ErrorEventOptions {
 // ServiceOptions настройки сервиса
 message ServiceOptions {
   string module_name = 1;        // Имя модуля (используется для генерации путей)
-  repeated string transport = 2;  // Список транспортов (REST, gRPC, NATS, Kafka)
+  // Список транспортов (REST, gRPC, GraphQL, NATS, Kafka)
+  // Пример: transport: ["REST", "GraphQL"] - генерирует REST и GraphQL адаптеры
+  // GraphQL автоматически создает Query, Mutation и Subscription резолверы
+  repeated string transport = 2;
 }
 

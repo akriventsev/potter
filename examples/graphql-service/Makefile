@@ -7,7 +7,7 @@ NATS_URL ?= nats://localhost:4222
 # Генерация кода из proto
 generate:
 	@echo "Generating code from proto files..."
-	potter-gen generate --proto api/proto/product_service.proto --with-graphql --output .
+	potter-gen generate --proto api/proto/product_service.proto --output .
 	@echo "Running gqlgen generate..."
 	cd api/graphql && gqlgen generate
 

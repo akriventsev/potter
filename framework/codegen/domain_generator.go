@@ -294,7 +294,7 @@ func (g *DomainGenerator) generateAggregate(agg AggregateSpec) string {
 }
 
 // generateEvents генерирует события
-func (g *DomainGenerator) generateEvents(spec *ParsedSpec, _ *GeneratorConfig) error {
+func (g *DomainGenerator) generateEvents(spec *ParsedSpec, config *GeneratorConfig) error {
 	var content strings.Builder
 
 	content.WriteString(g.addFileHeader("domain"))
@@ -302,8 +302,17 @@ func (g *DomainGenerator) generateEvents(spec *ParsedSpec, _ *GeneratorConfig) e
 	content.WriteString("\t\"time\"\n")
 	content.WriteString("\n")
 	content.WriteString("\t\"github.com/google/uuid\"\n")
-	content.WriteString("\t\"github.com/akriventsev/potter/framework/events\"\n")
-	content.WriteString("\t\"github.com/akriventsev/potter/framework/invoke\"\n")
+	potterPath := ""
+	if config != nil {
+		potterPath = config.PotterImportPath
+	}
+	if potterPath == "" {
+		potterPath = "github.com/akriventsev/potter"
+	}
+	// Удаляем @main или другие суффиксы версии для import-путей
+	baseImportPath := strings.Split(potterPath, "@")[0]
+	content.WriteString(fmt.Sprintf("\t\"%s/framework/events\"\n", baseImportPath))
+	content.WriteString(fmt.Sprintf("\t\"%s/framework/invoke\"\n", baseImportPath))
 	content.WriteString(")\n\n")
 
 	// Базовые типы

@@ -178,17 +178,15 @@ func (g *InfrastructureGenerator) generateRepository(agg AggregateSpec, config *
 	content.WriteString(strings.Join(selectFields, ", "))
 	content.WriteString(fmt.Sprintf(" FROM %%s WHERE id = $1\", r.table)\n\n"))
 
-	var scanVars []string
+	// Генерируем объявления переменных с правильными переносами
 	for _, field := range agg.Fields {
 		if field.Name == "id" {
 			continue
 		}
-		scanVars = append(scanVars, fmt.Sprintf("var %s %s",
+		content.WriteString(fmt.Sprintf("\tvar %s %s\n",
 			g.toPrivateField(field.Name), g.protoToGoType(field.Type)))
 	}
-	scanVars = append(scanVars, "var createdAt, updatedAt time.Time")
-	content.WriteString(strings.Join(scanVars, "\n\t"))
-	content.WriteString("\n")
+	content.WriteString("\tvar createdAt, updatedAt time.Time\n")
 	content.WriteString("\terr := r.db.QueryRow(ctx, query, id).Scan(")
 	var scanArgs []string
 	for _, field := range agg.Fields {
@@ -424,6 +422,7 @@ type Config struct {
 	Redis    RedisConfig
 	NATS     NATSConfig
 	Metrics  MetricsConfig
+	GraphQL  GraphQLConfig
 }
 
 // ServerConfig конфигурация сервера
@@ -454,6 +453,15 @@ type MetricsConfig struct {
 	Port    int
 }
 
+// GraphQLConfig конфигурация GraphQL
+type GraphQLConfig struct {
+	Port              int
+	EnablePlayground  bool
+	EnableIntrospection bool
+	ComplexityLimit   int
+	MaxDepth          int
+}
+
 // LoadConfig загружает конфигурацию из переменных окружения
 func LoadConfig() *Config {
 	return &Config{
@@ -474,6 +482,13 @@ func LoadConfig() *Config {
 		Metrics: MetricsConfig{
 			Enabled: getEnvAsBool("METRICS_ENABLED", true),
 			Port:    getEnvAsInt("METRICS_PORT", 2112),
+		},
+		GraphQL: GraphQLConfig{
+			Port:                getEnvAsInt("GRAPHQL_PORT", 8082),
+			EnablePlayground:   getEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true),
+			EnableIntrospection: getEnvAsBool("GRAPHQL_INTROSPECTION_ENABLED", true),
+			ComplexityLimit:     getEnvAsInt("GRAPHQL_COMPLEXITY_LIMIT", 1000),
+			MaxDepth:            getEnvAsInt("GRAPHQL_MAX_DEPTH", 15),
 		},
 	}
 }

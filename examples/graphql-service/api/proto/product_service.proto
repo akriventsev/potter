@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package product;
 
-import "github.com/akriventsev/potter/options.proto";
+import "potter/options.proto";
 
 option go_package = "product/api";
 

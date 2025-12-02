@@ -11,6 +11,8 @@ import (
 	"github.com/akriventsev/potter/framework/codegen"
 )
 
+const defaultPotterImportPath = "github.com/akriventsev/potter"
+
 func main() {
 	var flags flag.FlagSet
 	modulePath := flags.String("module", "", "Go module path")
@@ -78,6 +80,7 @@ func generate(gen *protogen.Plugin, modulePath, outputDir string) error {
 			PackageName:     string(file.GoPackageName),
 			Overwrite:       true,
 			PreserveUserCode: false,
+			PotterImportPath: defaultPotterImportPath,
 		}
 
 		// Запуск генераторов

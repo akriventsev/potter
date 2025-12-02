@@ -1,7 +1,7 @@
 syntax = "proto3";
 package example;
 
-import "github.com/akriventsev/potter/options.proto";
+import "potter/options.proto";
 
 option go_package = "example/api";
 
@@ -9,7 +9,8 @@ option go_package = "example/api";
 service SimpleService {
   option (potter.service) = {
     module_name: "simple"
-    transport: ["REST", "NATS"]
+    // GraphQL автоматически создаст Query, Mutation и Subscription резолверы
+    transport: ["REST", "GraphQL", "NATS"]
   };
 
   // CreateItem создает новый item
