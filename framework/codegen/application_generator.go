@@ -65,8 +65,7 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	// Удаляем @main или другие суффиксы версии для import-путей
 	baseImportPath := strings.Split(potterPath, "@")[0]
 	content.WriteString(fmt.Sprintf("\t\"%s/framework/events\"\n", baseImportPath))
-	// Импорты invoke и time добавляются только если они используются в закомментированном коде
-	// Они будут добавлены пользователем при раскомментировании кода сохранения и публикации событий
+	content.WriteString(fmt.Sprintf("\t\"%s/framework/invoke\"\n", baseImportPath))
 	content.WriteString(fmt.Sprintf("\t\"%s/framework/transport\"\n", baseImportPath))
 	content.WriteString(")\n\n")
 
@@ -105,34 +104,28 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	content.WriteString("}\n\n")
 
 	content.WriteString(fmt.Sprintf("func (h *%s) Handle(ctx context.Context, cmd transport.Command) error {\n", handlerName))
-	content.WriteString(fmt.Sprintf("\t_, ok := cmd.(%s)\n", cmdName))
+	content.WriteString(fmt.Sprintf("\t%s, ok := cmd.(%s)\n", strings.ToLower(cmd.Name), cmdName))
 	content.WriteString("\tif !ok {\n")
-	content.WriteString(fmt.Sprintf("\t\treturn fmt.Errorf(\"invalid command type: %%T\", cmd)\n"))
+	content.WriteString("\t\treturn fmt.Errorf(\"invalid command type: %T\", cmd)\n")
 	content.WriteString("\t}\n\n")
-	content.WriteString(fmt.Sprintf("\t// Переменная команды будет доступна после раскомментирования кода ниже\n"))
-	content.WriteString(fmt.Sprintf("\t// %s := cmd.(%s)\n", strings.ToLower(cmd.Name), cmdName))
-	content.WriteString("\n")
 
-	content.WriteString("// USER CODE BEGIN: Validation\n")
-	content.WriteString("// Add validation logic here\n")
-	content.WriteString("// USER CODE END: Validation\n\n")
+	// Вызов пользовательской функции валидации
+	validationFuncName := fmt.Sprintf("validate%s", cmd.Name)
+	content.WriteString(fmt.Sprintf("\t// Валидация команды\n"))
+	content.WriteString(fmt.Sprintf("\tif err := %s(ctx, %s); err != nil {\n", validationFuncName, strings.ToLower(cmd.Name)))
+	content.WriteString("\t\treturn fmt.Errorf(\"validation failed: %w\", err)\n")
+	content.WriteString("\t}\n\n")
 
-	content.WriteString("// USER CODE BEGIN: BusinessLogic\n")
-	content.WriteString("// TODO: Implement business logic here\n")
-	content.WriteString(fmt.Sprintf("// REQUIRED: Create the aggregate variable '%s' before the code below:\n", strings.ToLower(cmd.Aggregate)))
-	content.WriteString(fmt.Sprintf("// %s := domain.New%s(...)\n",
-		strings.ToLower(cmd.Aggregate), cmd.Aggregate))
-	content.WriteString(fmt.Sprintf("// Example: %s := domain.New%s(%s.Name, %s.Description, %s.Quantity)\n",
-		strings.ToLower(cmd.Aggregate), cmd.Aggregate,
-		strings.ToLower(cmd.Name), strings.ToLower(cmd.Name), strings.ToLower(cmd.Name)))
-	content.WriteString("// USER CODE END: BusinessLogic\n\n")
+	// Вызов пользовательской функции бизнес-логики
+	businessLogicFuncName := fmt.Sprintf("execute%sBusinessLogic", cmd.Name)
+	content.WriteString(fmt.Sprintf("\t// Выполнение бизнес-логики\n"))
+	content.WriteString(fmt.Sprintf("\t%s, err := %s(ctx, h.%s, %s)\n",
+		strings.ToLower(cmd.Aggregate), businessLogicFuncName, repoVarName, strings.ToLower(cmd.Name)))
+	content.WriteString("\tif err != nil {\n")
+	content.WriteString("\t\treturn fmt.Errorf(\"business logic failed: %w\", err)\n")
+	content.WriteString("\t}\n\n")
 
-	// Добавляем комментарий о необходимости раскомментировать код ниже
-	content.WriteString(fmt.Sprintf("\t// ВАЖНО: Раскомментируйте код ниже после создания переменной '%s' в секции USER CODE выше\n", strings.ToLower(cmd.Aggregate)))
-	content.WriteString(fmt.Sprintf("\t// Пример: %s := domain.New%s(...)\n\n", strings.ToLower(cmd.Aggregate), cmd.Aggregate))
-
-	// Закомментируем код сохранения и публикации событий
-	content.WriteString(fmt.Sprintf("\t/*\n"))
+	// Сохранение и публикация событий
 	content.WriteString(fmt.Sprintf("\t// Сохранение %s\n", strings.ToLower(cmd.Aggregate)))
 	content.WriteString(fmt.Sprintf("\tif err := h.%s.Save(ctx, %s); err != nil {\n",
 		repoVarName, strings.ToLower(cmd.Aggregate)))
@@ -156,7 +149,7 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	content.WriteString("\t\t}\n")
 	content.WriteString("\t}\n")
 	content.WriteString(fmt.Sprintf("\t%s.ClearEvents()\n", strings.ToLower(cmd.Aggregate)))
-	content.WriteString("\t*/\n\n")
+	content.WriteString("\n")
 	content.WriteString("\treturn nil\n")
 	content.WriteString("}\n\n")
 
@@ -164,8 +157,69 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	content.WriteString(fmt.Sprintf("\treturn %q\n", g.converter.ToSnakeCase(cmd.Name)))
 	content.WriteString("}\n")
 
-	path := fmt.Sprintf("application/command/%s.go", g.converter.ToSnakeCase(cmd.Name))
-	return g.writer.WriteFile(path, content.String())
+	path := fmt.Sprintf("application/command/%s.gen.go", g.converter.ToSnakeCase(cmd.Name))
+	if err := g.writer.WriteFile(path, content.String()); err != nil {
+		return err
+	}
+
+	// Генерация отдельного файла для пользовательского кода
+	return g.generateCommandUserCode(cmd, config)
+}
+
+// generateCommandUserCode генерирует отдельный файл для пользовательского кода команды
+func (g *ApplicationGenerator) generateCommandUserCode(cmd CommandSpec, config *GeneratorConfig) error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package command\n\n")
+	userContent.WriteString(fmt.Sprintf("// Этот файл содержит пользовательский код для команды %s.\n", cmd.Name))
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n\n")
+	userContent.WriteString("import (\n")
+	userContent.WriteString("\t\"context\"\n")
+	userContent.WriteString("\t\"fmt\"\n")
+	userContent.WriteString("\n")
+	if config != nil && config.ModulePath != "" {
+		userContent.WriteString(fmt.Sprintf("\t\"%s/domain\"\n", config.ModulePath))
+	} else {
+		userContent.WriteString("\t\"domain\"\n")
+	}
+	// Импорт transport не нужен в пользовательском коде команды
+	userContent.WriteString(")\n\n")
+
+	// Функция валидации
+	cmdName := fmt.Sprintf("%sCommand", cmd.Name)
+	validationFuncName := fmt.Sprintf("validate%s", cmd.Name)
+	userContent.WriteString(fmt.Sprintf("// %s валидирует команду %s\n", validationFuncName, cmd.Name))
+	userContent.WriteString(fmt.Sprintf("// Реализуйте валидацию входных данных здесь\n"))
+	userContent.WriteString(fmt.Sprintf("func %s(ctx context.Context, cmd %s) error {\n", validationFuncName, cmdName))
+	userContent.WriteString("\t// TODO: Add validation logic here\n")
+	userContent.WriteString("\t// Example:\n")
+	userContent.WriteString("\t// if cmd.Name == \"\" {\n")
+	userContent.WriteString("\t//     return fmt.Errorf(\"name is required\")\n")
+	userContent.WriteString("\t// }\n")
+	userContent.WriteString("\treturn nil\n")
+	userContent.WriteString("}\n\n")
+
+	// Функция бизнес-логики
+	businessLogicFuncName := fmt.Sprintf("execute%sBusinessLogic", cmd.Name)
+	repoName := fmt.Sprintf("%sRepository", cmd.Aggregate)
+	userContent.WriteString(fmt.Sprintf("// %s выполняет бизнес-логику команды %s\n", businessLogicFuncName, cmd.Name))
+	userContent.WriteString(fmt.Sprintf("// Реализуйте создание и изменение агрегата здесь\n"))
+	userContent.WriteString(fmt.Sprintf("// Возвращает созданный/измененный агрегат %s\n", cmd.Aggregate))
+	userContent.WriteString(fmt.Sprintf("func %s(ctx context.Context, repo domain.%s, cmd %s) (*domain.%s, error) {\n",
+		businessLogicFuncName, repoName, cmdName, cmd.Aggregate))
+	userContent.WriteString("\t// TODO: Implement business logic here\n")
+	userContent.WriteString(fmt.Sprintf("\t// Example: Create %s aggregate\n", strings.ToLower(cmd.Aggregate)))
+	userContent.WriteString(fmt.Sprintf("\t// %s := domain.New%s(\n", strings.ToLower(cmd.Aggregate), cmd.Aggregate))
+	userContent.WriteString("\t//     cmd.Name,\n")
+	userContent.WriteString("\t//     cmd.Description,\n")
+	userContent.WriteString("\t//     cmd.Quantity,\n")
+	userContent.WriteString("\t// )\n")
+	userContent.WriteString(fmt.Sprintf("\t// return %s, nil\n", strings.ToLower(cmd.Aggregate)))
+	userContent.WriteString("\treturn nil, fmt.Errorf(\"not implemented\")\n")
+	userContent.WriteString("}\n")
+
+	userPath := fmt.Sprintf("application/command/%s.go", g.converter.ToSnakeCase(cmd.Name))
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // generateQueries генерирует запросы и handlers
@@ -335,24 +389,15 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	}
 
 	content.WriteString(fmt.Sprintf("func (h *%s) Handle(ctx context.Context, q transport.Query) (interface{}, error) {\n", handlerName))
-	content.WriteString(fmt.Sprintf("\t_, ok := q.(%s)\n", queryName))
+	content.WriteString(fmt.Sprintf("\t%s, ok := q.(%s)\n", strings.ToLower(query.Name), queryName))
 	content.WriteString("\tif !ok {\n")
 	content.WriteString("\t\treturn nil, fmt.Errorf(\"invalid query type: %T\", q)\n")
 	content.WriteString("\t}\n\n")
-	content.WriteString(fmt.Sprintf("\t// Переменная запроса будет доступна после раскомментирования кода ниже\n"))
-	content.WriteString(fmt.Sprintf("\t// %s := q.(%s)\n", strings.ToLower(query.Name), queryName))
-	content.WriteString("\n")
 
 	if query.Cacheable {
+		// Генерация cache key через пользовательскую функцию
 		content.WriteString("\t// Попытка получить из кеша\n")
-		content.WriteString("\t// TODO: Customize cache key based on query parameters\n")
-		content.WriteString("\t// Раскомментируйте переменную запроса выше и используйте её для формирования cache key:\n")
-		content.WriteString(fmt.Sprintf("\t// cacheKey := fmt.Sprintf(\"%s:%%v\", %s)\n",
-			g.converter.ToSnakeCase(query.Name), strings.ToLower(query.Name)))
-		content.WriteString(fmt.Sprintf("\t// Example with specific field: cacheKey := fmt.Sprintf(\"%s:%%s\", %s.ID)\n",
-			g.converter.ToSnakeCase(query.Name), strings.ToLower(query.Name)))
-		content.WriteString("\t// Временный cache key для примера (замените на реальный после раскомментирования переменной запроса):\n")
-		content.WriteString(fmt.Sprintf("\tcacheKey := fmt.Sprintf(\"%s:placeholder\")\n", g.converter.ToSnakeCase(query.Name)))
+		content.WriteString(fmt.Sprintf("\tcacheKey := build%sCacheKey(%s)\n", query.Name, strings.ToLower(query.Name)))
 		content.WriteString(fmt.Sprintf("\tvar response %s\n", responseName))
 		content.WriteString("\texists, err := h.cache.Get(ctx, cacheKey, &response)\n")
 		content.WriteString("\tif err == nil && exists {\n")
@@ -360,19 +405,18 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 		content.WriteString("\t}\n\n")
 	}
 
-	content.WriteString("// USER CODE BEGIN: LoadData\n")
-	content.WriteString("// Load data from repository\n")
-	content.WriteString("// USER CODE END: LoadData\n\n")
-
-	content.WriteString("\t// Маппинг в response\n")
+	// Вызов пользовательской функции загрузки данных
+	loadDataFuncName := fmt.Sprintf("load%sData", query.Name)
+	content.WriteString("\t// Загрузка данных\n")
 	if query.Cacheable {
-		// Если cacheable, переменная response уже объявлена выше
-		content.WriteString(fmt.Sprintf("\tresponse = %s{\n", responseName))
+		// Если cacheable, переменные response и err уже объявлены выше
+		content.WriteString(fmt.Sprintf("\tresponse, err = %s(ctx, h, %s)\n", loadDataFuncName, strings.ToLower(query.Name)))
 	} else {
-		// Если не cacheable, нужно объявить переменную
-		content.WriteString(fmt.Sprintf("\tresponse := %s{\n", responseName))
+		// Если не cacheable, нужно объявить переменные
+		content.WriteString(fmt.Sprintf("\tresponse, err := %s(ctx, h, %s)\n", loadDataFuncName, strings.ToLower(query.Name)))
 	}
-	content.WriteString("\t\t// Map fields here\n")
+	content.WriteString("\tif err != nil {\n")
+	content.WriteString("\t\treturn nil, fmt.Errorf(\"failed to load data: %w\", err)\n")
 	content.WriteString("\t}\n\n")
 
 	if query.Cacheable {
@@ -391,8 +435,65 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	content.WriteString(fmt.Sprintf("\treturn %q\n", g.converter.ToSnakeCase(query.Name)))
 	content.WriteString("}\n")
 
-	path := fmt.Sprintf("application/query/%s.go", g.converter.ToSnakeCase(query.Name))
-	return g.writer.WriteFile(path, content.String())
+	path := fmt.Sprintf("application/query/%s.gen.go", g.converter.ToSnakeCase(query.Name))
+	if err := g.writer.WriteFile(path, content.String()); err != nil {
+		return err
+	}
+
+	// Генерация отдельного файла для пользовательского кода
+	return g.generateQueryUserCode(query, spec, config)
+}
+
+// generateQueryUserCode генерирует отдельный файл для пользовательского кода запроса
+func (g *ApplicationGenerator) generateQueryUserCode(query QuerySpec, spec *ParsedSpec, config *GeneratorConfig) error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package query\n\n")
+	userContent.WriteString(fmt.Sprintf("// Этот файл содержит пользовательский код для запроса %s.\n", query.Name))
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n\n")
+	userContent.WriteString("import (\n")
+	userContent.WriteString("\t\"context\"\n")
+	userContent.WriteString("\t\"fmt\"\n")
+	userContent.WriteString(")\n\n")
+	// Импорты domain и cache не добавляются автоматически, так как они могут быть неиспользованы
+	// Пользователь добавит их при необходимости
+
+	queryName := fmt.Sprintf("%sQuery", query.Name)
+	handlerName := fmt.Sprintf("%sHandler", query.Name)
+	responseName := fmt.Sprintf("%sResponse", query.Name)
+
+	// Функция построения cache key (если cacheable)
+	if query.Cacheable {
+		cacheKeyFuncName := fmt.Sprintf("build%sCacheKey", query.Name)
+		userContent.WriteString(fmt.Sprintf("// %s строит cache key для запроса %s\n", cacheKeyFuncName, query.Name))
+		userContent.WriteString(fmt.Sprintf("func %s(q %s) string {\n", cacheKeyFuncName, queryName))
+		userContent.WriteString("\t// TODO: Customize cache key based on query parameters\n")
+		userContent.WriteString(fmt.Sprintf("\t// Example: return fmt.Sprintf(\"%s:%%s\", q.ID)\n", g.converter.ToSnakeCase(query.Name)))
+		userContent.WriteString(fmt.Sprintf("\treturn fmt.Sprintf(\"%s:%%v\", q)\n", g.converter.ToSnakeCase(query.Name)))
+		userContent.WriteString("}\n\n")
+	}
+
+	// Функция загрузки данных
+	loadDataFuncName := fmt.Sprintf("load%sData", query.Name)
+	userContent.WriteString(fmt.Sprintf("// %s загружает данные для запроса %s\n", loadDataFuncName, query.Name))
+	userContent.WriteString(fmt.Sprintf("// Реализуйте загрузку данных из репозитория или read model здесь\n"))
+	userContent.WriteString(fmt.Sprintf("func %s(ctx context.Context, h *%s, q %s) (%s, error) {\n",
+		loadDataFuncName, handlerName, queryName, responseName))
+	userContent.WriteString("\t// TODO: Load data from repository or read model\n")
+	userContent.WriteString("\t// Example:\n")
+	userContent.WriteString("\t// item, err := h.itemRepo.FindByID(ctx, q.ID)\n")
+	userContent.WriteString("\t// if err != nil {\n")
+	userContent.WriteString("\t//     return nil, err\n")
+	userContent.WriteString("\t// }\n")
+	userContent.WriteString("\t// return GetItemResponse{\n")
+	userContent.WriteString("\t//     ID: item.ID(),\n")
+	userContent.WriteString("\t//     Name: item.Name(),\n")
+	userContent.WriteString("\t// }, nil\n")
+	userContent.WriteString(fmt.Sprintf("\treturn %s{}, fmt.Errorf(\"not implemented\")\n", responseName))
+	userContent.WriteString("}\n")
+
+	userPath := fmt.Sprintf("application/query/%s.go", g.converter.ToSnakeCase(query.Name))
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // inferAggregateFromQueryName определяет имя агрегата из имени query

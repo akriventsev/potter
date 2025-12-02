@@ -139,7 +139,7 @@ func (g *GraphQLSchemaGenerator) generateGqlgenConfig(spec *ParsedSpec, config *
 // generateResolverStubs генерирует resolver stubs
 func (g *GraphQLSchemaGenerator) generateResolverStubs(spec *ParsedSpec, config *GeneratorConfig) error {
 	// Проверяем, существует ли файл resolvers.go
-	if g.writer.FileExists("api/graphql/resolvers.go") {
+	if g.writer.FileExists("api/graphql/resolvers.gen.go") {
 		// Не перезаписываем существующий файл
 		return nil
 	}
@@ -150,7 +150,7 @@ func (g *GraphQLSchemaGenerator) generateResolverStubs(spec *ParsedSpec, config 
 	content.WriteString("// This file will be overwritten by gqlgen\n")
 	content.WriteString("// Run 'gqlgen generate' to regenerate\n\n")
 
-	path := "api/graphql/resolvers.go"
+	path := "api/graphql/resolvers.gen.go"
 	return g.writer.WriteFile(path, content.String())
 }
 
@@ -209,7 +209,7 @@ func (g *GraphQLSchemaGenerator) GeneratePotterResolvers(spec *ParsedSpec, confi
 	content.WriteString("//     adapter.RegisterResolver(\"Query\", \"customField\", customResolver)\n")
 	content.WriteString("// }\n")
 
-	path := "api/graphql/potter_resolvers.go"
+	path := "api/graphql/potter_resolvers.gen.go"
 	return g.writer.WriteFile(path, content.String())
 }
 

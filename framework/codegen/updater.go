@@ -152,13 +152,16 @@ func (u *CodeUpdater) ParseExistingFile(path string) (*ParsedFile, error) {
 		return true
 	})
 
-	// Извлечение пользовательского кода
-	parsed.UserCodeBlocks = u.ExtractUserCode(string(data))
+	// Пользовательский код больше не извлекается из маркеров,
+	// так как он находится в отдельных файлах без .gen. в названии
+	parsed.UserCodeBlocks = make(map[string]string)
 
 	return parsed, nil
 }
 
-// ExtractUserCode извлекает блоки пользовательского кода
+// ExtractUserCode извлекает блоки пользовательского кода из маркеров USER CODE BEGIN/END
+// DEPRECATED: Эта функция больше не используется, так как пользовательский код теперь в отдельных файлах
+// Оставлена для обратной совместимости
 func (u *CodeUpdater) ExtractUserCode(fileContent string) map[string]string {
 	blocks := make(map[string]string)
 
@@ -177,7 +180,9 @@ func (u *CodeUpdater) ExtractUserCode(fileContent string) map[string]string {
 	return blocks
 }
 
-// MergeWithUserCode вставляет пользовательский код в сгенерированный
+// MergeWithUserCode вставляет пользовательский код в сгенерированный через маркеры
+// DEPRECATED: Эта функция больше не используется, так как пользовательский код теперь в отдельных файлах
+// Оставлена для обратной совместимости
 func (u *CodeUpdater) MergeWithUserCode(generated, userCode string, marker string) string {
 	// Поиск маркера в сгенерированном коде
 	beginPattern := regexp.MustCompile(fmt.Sprintf(`//\s*USER CODE BEGIN:\s*%s\s*\n`, regexp.QuoteMeta(marker)))
@@ -309,7 +314,8 @@ func (u *CodeUpdater) CreateBackup(path string) error {
 	return os.WriteFile(backupPath, data, 0644)
 }
 
-// UpdateGeneratedFiles обновляет сгенерированные файлы, сохраняя пользовательский код
+// UpdateGeneratedFiles обновляет сгенерированные файлы (.gen.go), пропуская пользовательские файлы
+// Пользовательские файлы (без .gen. в названии) не обновляются автоматически
 func (u *CodeUpdater) UpdateGeneratedFiles(spec *ParsedSpec, config *GeneratorConfig) ([]FileChange, error) {
 	var changes []FileChange
 
@@ -320,9 +326,12 @@ func (u *CodeUpdater) UpdateGeneratedFiles(spec *ParsedSpec, config *GeneratorCo
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Создаем генераторы
+	// Создаем генераторы для всех слоев
 	domainGen := NewDomainGenerator(tempDir)
 	appGen := NewApplicationGenerator(tempDir)
+	infraGen := NewInfrastructureGenerator(tempDir)
+	presentationGen := NewPresentationGenerator(tempDir)
+	mainGen := NewMainGenerator(tempDir)
 
 	// Генерируем все файлы во временную директорию
 	if err := domainGen.Generate(spec, config); err != nil {
@@ -330,6 +339,15 @@ func (u *CodeUpdater) UpdateGeneratedFiles(spec *ParsedSpec, config *GeneratorCo
 	}
 	if err := appGen.Generate(spec, config); err != nil {
 		return nil, fmt.Errorf("failed to generate application: %w", err)
+	}
+	if err := infraGen.Generate(spec, config); err != nil {
+		return nil, fmt.Errorf("failed to generate infrastructure: %w", err)
+	}
+	if err := presentationGen.Generate(spec, config); err != nil {
+		return nil, fmt.Errorf("failed to generate presentation: %w", err)
+	}
+	if err := mainGen.Generate(spec, config); err != nil {
+		return nil, fmt.Errorf("failed to generate main: %w", err)
 	}
 
 	// Сканируем все .go файлы в outputDir
@@ -348,8 +366,21 @@ func (u *CodeUpdater) UpdateGeneratedFiles(spec *ParsedSpec, config *GeneratorCo
 		}
 
 		// Пропускаем файлы вне основных директорий
+		// main.go обрабатывается отдельно, так как он может быть отредактирован пользователем
 		if !strings.HasPrefix(relPath, "domain/") &&
-			!strings.HasPrefix(relPath, "application/") {
+			!strings.HasPrefix(relPath, "application/") &&
+			!strings.HasPrefix(relPath, "infrastructure/") &&
+			!strings.HasPrefix(relPath, "presentation/") &&
+			!strings.HasPrefix(relPath, "api/") &&
+			!strings.HasPrefix(relPath, "config/") &&
+			!strings.HasPrefix(relPath, "cmd/") {
+			return nil
+		}
+
+		// Пропускаем пользовательские файлы (без .gen. в названии)
+		// Пользовательские файлы не должны обновляться автоматически
+		// Исключение: cmd/server/main.go может быть обновлен, если он не был изменен пользователем
+		if !strings.Contains(relPath, ".gen.go") && relPath != "cmd/server/main.go" {
 			return nil
 		}
 
@@ -366,10 +397,8 @@ func (u *CodeUpdater) UpdateGeneratedFiles(spec *ParsedSpec, config *GeneratorCo
 			return nil
 		}
 
-		// Извлекаем пользовательский код
-		userCode := oldParsed.UserCodeBlocks
-
 		// Проверяем, существует ли новый файл во временной директории
+		// Новые файлы также должны иметь .gen. в названии
 		newPath := filepath.Join(tempDir, relPath)
 		if _, err := os.Stat(newPath); os.IsNotExist(err) {
 			// Файл удален в новой версии - пропускаем
@@ -395,10 +424,7 @@ func (u *CodeUpdater) UpdateGeneratedFiles(spec *ParsedSpec, config *GeneratorCo
 			}
 		}
 
-		// Мержим пользовательский код обратно
-		for marker, code := range userCode {
-			newContent = u.MergeWithUserCode(newContent, code, marker)
-		}
+		// Пользовательский код больше не мержится, так как он в отдельных файлах
 
 		// Если есть изменения, создаем FileChange
 		if newContent != string(oldContent) {

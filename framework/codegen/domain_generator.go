@@ -35,7 +35,7 @@ func (g *DomainGenerator) Generate(spec *ParsedSpec, config *GeneratorConfig) er
 }
 
 // generateAggregates генерирует агрегаты
-func (g *DomainGenerator) generateAggregates(spec *ParsedSpec, _ *GeneratorConfig) error {
+func (g *DomainGenerator) generateAggregates(spec *ParsedSpec, config *GeneratorConfig) error {
 	var content strings.Builder
 
 	// Заголовок файла
@@ -56,8 +56,59 @@ func (g *DomainGenerator) generateAggregates(spec *ParsedSpec, _ *GeneratorConfi
 		content.WriteString("\n")
 	}
 
-	path := "domain/aggregates.go"
-	return g.writer.WriteFile(path, content.String())
+	path := "domain/aggregates.gen.go"
+	if err := g.writer.WriteFile(path, content.String()); err != nil {
+		return err
+	}
+
+	// Генерация отдельного файла для пользовательского кода агрегатов
+	return g.generateAggregatesUserCode(spec, config)
+}
+
+// generateAggregatesUserCode генерирует отдельный файл для пользовательского кода агрегатов
+func (g *DomainGenerator) generateAggregatesUserCode(spec *ParsedSpec, config *GeneratorConfig) error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package domain\n\n")
+	userContent.WriteString("// Этот файл содержит пользовательский код для агрегатов.\n")
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n\n")
+	userContent.WriteString("import (\n")
+	userContent.WriteString("\t// Add your imports here if needed\n")
+	userContent.WriteString(")\n\n")
+
+	// Генерация функций обновления для каждого агрегата
+	for _, agg := range spec.Aggregates {
+		updateFuncName := fmt.Sprintf("update%s", agg.Name)
+		userContent.WriteString(fmt.Sprintf("// %s реализует логику обновления агрегата %s\n", updateFuncName, agg.Name))
+		userContent.WriteString(fmt.Sprintf("// Реализуйте логику обновления полей агрегата здесь\n"))
+		userContent.WriteString(fmt.Sprintf("func %s(%s *%s", updateFuncName, strings.ToLower(string(agg.Name[0])), agg.Name))
+
+		var updateParams []string
+		for _, field := range agg.Fields {
+			if field.Name == "id" {
+				continue
+			}
+			goType := g.protoToGoType(field.Type)
+			updateParams = append(updateParams, fmt.Sprintf("%s %s", g.toPrivateField(field.Name), goType))
+		}
+		if len(updateParams) > 0 {
+			userContent.WriteString(", " + strings.Join(updateParams, ", "))
+		}
+		userContent.WriteString(") {\n")
+		userContent.WriteString("\t// TODO: Implement update logic here\n")
+		userContent.WriteString("\t// Example:\n")
+		for _, field := range agg.Fields {
+			if field.Name == "id" {
+				continue
+			}
+			userContent.WriteString(fmt.Sprintf("\t// %s.%s = %s\n",
+				strings.ToLower(string(agg.Name[0])), g.toPrivateField(field.Name), g.toPrivateField(field.Name)))
+		}
+		userContent.WriteString("}\n\n")
+	}
+
+	userPath := "domain/aggregates.go"
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // generateBaseAggregate генерирует базовый агрегат
@@ -281,11 +332,17 @@ func (g *DomainGenerator) generateAggregate(agg AggregateSpec) string {
 	builder.WriteString(strings.Join(updateParams, ", "))
 	builder.WriteString(") {\n")
 
-	builder.WriteString("// USER CODE BEGIN: Update")
-	builder.WriteString(fmt.Sprintf("%s\n", agg.Name))
-	builder.WriteString("// Add your update logic here\n")
-	builder.WriteString("// USER CODE END: Update")
-	builder.WriteString(fmt.Sprintf("%s\n", agg.Name))
+	// Вызов пользовательской функции обновления
+	updateFuncName := fmt.Sprintf("update%s", agg.Name)
+	builder.WriteString(fmt.Sprintf("\t// Вызов пользовательской логики обновления\n"))
+	builder.WriteString(fmt.Sprintf("\t%s(%s", updateFuncName, strings.ToLower(string(agg.Name[0]))))
+	for _, field := range agg.Fields {
+		if field.Name == "id" {
+			continue
+		}
+		builder.WriteString(fmt.Sprintf(", %s", g.toPrivateField(field.Name)))
+	}
+	builder.WriteString(")\n")
 
 	builder.WriteString(fmt.Sprintf("\t%s.updatedAt = time.Now()\n", strings.ToLower(string(agg.Name[0]))))
 	builder.WriteString("}\n\n")
@@ -369,8 +426,31 @@ func (g *DomainGenerator) generateEvents(spec *ParsedSpec, config *GeneratorConf
 		content.WriteString("\n")
 	}
 
-	path := "domain/events.go"
-	return g.writer.WriteFile(path, content.String())
+	path := "domain/events.gen.go"
+	if err := g.writer.WriteFile(path, content.String()); err != nil {
+		return err
+	}
+
+	// Создаем пустой пользовательский файл для events (если нужно добавить кастомные события)
+	return g.generateEventsUserCode()
+}
+
+// generateEventsUserCode генерирует пустой пользовательский файл для событий
+func (g *DomainGenerator) generateEventsUserCode() error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package domain\n\n")
+	userContent.WriteString("// Этот файл предназначен для добавления пользовательских событий.\n")
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n")
+	userContent.WriteString("// Если вам нужно добавить кастомные события, определите их здесь.\n\n")
+	userContent.WriteString("// Пример:\n")
+	userContent.WriteString("// type CustomEvent struct {\n")
+	userContent.WriteString("//     BaseEvent\n")
+	userContent.WriteString("//     CustomField string\n")
+	userContent.WriteString("// }\n")
+
+	userPath := "domain/events.go"
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // generateEvent генерирует код для одного события
@@ -458,8 +538,33 @@ func (g *DomainGenerator) generateRepositories(spec *ParsedSpec, _ *GeneratorCon
 		content.WriteString("\n")
 	}
 
-	path := "domain/repository.go"
-	return g.writer.WriteFile(path, content.String())
+	path := "domain/repository.gen.go"
+	if err := g.writer.WriteFile(path, content.String()); err != nil {
+		return err
+	}
+
+	// Создаем пустой пользовательский файл для repository (если нужно добавить кастомные методы)
+	return g.generateRepositoryUserCode()
+}
+
+// generateRepositoryUserCode генерирует пустой пользовательский файл для репозиториев
+func (g *DomainGenerator) generateRepositoryUserCode() error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package domain\n\n")
+	userContent.WriteString("// Этот файл предназначен для расширения интерфейсов репозиториев.\n")
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n")
+	userContent.WriteString("// Если вам нужно добавить кастомные методы в интерфейсы репозиториев, определите их здесь.\n\n")
+	userContent.WriteString("// Пример:\n")
+	userContent.WriteString("// type ItemRepository interface {\n")
+	userContent.WriteString("//     // Базовые методы уже определены в repository.gen.go\n")
+	userContent.WriteString("//     \n")
+	userContent.WriteString("//     // Добавьте ваши кастомные методы здесь:\n")
+	userContent.WriteString("//     FindByName(ctx context.Context, name string) (*Item, error)\n")
+	userContent.WriteString("// }\n")
+
+	userPath := "domain/repository.go"
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // generateRepository генерирует интерфейс репозитория

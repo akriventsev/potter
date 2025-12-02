@@ -99,48 +99,10 @@ func (g *InfrastructureGenerator) generateRepository(agg AggregateSpec, config *
 	// Параметры: id ($1), поля ($2..$N+1), created_at ($N+2), updated_at ($N+3)
 	// Для UPDATE: те же поля, но created_at не обновляется, updated_at последний
 
-	createdAtIdx := 2 + nonIDFields
-	updatedAtIdx := createdAtIdx + 1
-
-	content.WriteString("// USER CODE BEGIN: SaveSQL\n")
-
-	// Формируем список полей для INSERT
-	var insertFields []string
-	var insertPlaceholders []string
-	insertFields = append(insertFields, "id")
-	insertPlaceholders = append(insertPlaceholders, "$1")
-	paramIdx := 2
-	for _, field := range agg.Fields {
-		if field.Name == "id" {
-			continue
-		}
-		insertFields = append(insertFields, g.converter.ToSnakeCase(field.Name))
-		insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", paramIdx))
-		paramIdx++
-	}
-	insertFields = append(insertFields, "created_at", "updated_at")
-	insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", createdAtIdx), fmt.Sprintf("$%d", updatedAtIdx))
-
-	// Формируем UPDATE SET часть
-	var updates []string
-	updateParamIdx := 2 // Начинаем с поля после id
-	for _, field := range agg.Fields {
-		if field.Name == "id" || field.Name == "created_at" {
-			continue
-		}
-		updates = append(updates, fmt.Sprintf("%s = $%d", g.converter.ToSnakeCase(field.Name), updateParamIdx))
-		updateParamIdx++
-	}
-	updates = append(updates, fmt.Sprintf("updated_at = $%d", updatedAtIdx))
-
-	queryTemplate := "\tquery := fmt.Sprintf(`\n" +
-		"\t\tINSERT INTO %s (" + strings.Join(insertFields, ", ") + ") \n" +
-		"\t\tVALUES (" + strings.Join(insertPlaceholders, ", ") + ")\n" +
-		"\t\tON CONFLICT (id) \n" +
-		"\t\tDO UPDATE SET " + strings.Join(updates, ", ") + "\n" +
-		"\t`, r.table)\n"
-	content.WriteString(queryTemplate)
-	content.WriteString("// USER CODE END: SaveSQL\n\n")
+	// Вызов пользовательской функции для построения SQL запроса
+	buildSQLFuncName := fmt.Sprintf("build%sSaveSQL", agg.Name)
+	content.WriteString(fmt.Sprintf("\t// Построение SQL запроса\n"))
+	content.WriteString(fmt.Sprintf("\tquery := %s(r.table)\n", buildSQLFuncName))
 	content.WriteString("\t_, err := r.db.Exec(ctx, query,\n")
 	content.WriteString(fmt.Sprintf("\t\t%s.ID(),\n", strings.ToLower(agg.Name)))
 	for _, field := range agg.Fields {
@@ -230,8 +192,83 @@ func (g *InfrastructureGenerator) generateRepository(agg AggregateSpec, config *
 	content.WriteString("\treturn nil\n")
 	content.WriteString("}\n")
 
-	path := fmt.Sprintf("infrastructure/repository/%s_repository.go", g.converter.ToSnakeCase(agg.Name))
-	return g.writer.WriteFile(path, content.String())
+	path := fmt.Sprintf("infrastructure/repository/%s_repository.gen.go", g.converter.ToSnakeCase(agg.Name))
+	if err := g.writer.WriteFile(path, content.String()); err != nil {
+		return err
+	}
+
+	// Генерация отдельного файла для пользовательского кода
+	return g.generateRepositoryUserCode(agg, config)
+}
+
+// generateRepositoryUserCode генерирует отдельный файл для пользовательского кода репозитория
+func (g *InfrastructureGenerator) generateRepositoryUserCode(agg AggregateSpec, config *GeneratorConfig) error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package repository\n\n")
+	userContent.WriteString(fmt.Sprintf("// Этот файл содержит пользовательский код для репозитория %s.\n", agg.Name))
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n\n")
+	userContent.WriteString("import (\n")
+	userContent.WriteString("\t\"fmt\"\n")
+	userContent.WriteString(")\n\n")
+
+	// Функция построения SQL запроса для Save
+	buildSQLFuncName := fmt.Sprintf("build%sSaveSQL", agg.Name)
+	userContent.WriteString(fmt.Sprintf("// %s строит SQL запрос для сохранения %s\n", buildSQLFuncName, agg.Name))
+	userContent.WriteString(fmt.Sprintf("// Реализуйте кастомный SQL запрос здесь, если нужна особая логика\n"))
+	userContent.WriteString(fmt.Sprintf("func %s(tableName string) string {\n", buildSQLFuncName))
+
+	// Подсчет полей (без id)
+	nonIDFields := 0
+	for _, field := range agg.Fields {
+		if field.Name != "id" {
+			nonIDFields++
+		}
+	}
+
+	// Параметры: id ($1), поля ($2..$N+1), created_at ($N+2), updated_at ($N+3)
+	createdAtIdx := 2 + nonIDFields
+	updatedAtIdx := createdAtIdx + 1
+
+	// Формируем список полей для INSERT
+	var insertFields []string
+	var insertPlaceholders []string
+	insertFields = append(insertFields, "id")
+	insertPlaceholders = append(insertPlaceholders, "$1")
+	paramIdx := 2
+	for _, field := range agg.Fields {
+		if field.Name == "id" {
+			continue
+		}
+		insertFields = append(insertFields, g.converter.ToSnakeCase(field.Name))
+		insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", paramIdx))
+		paramIdx++
+	}
+	insertFields = append(insertFields, "created_at", "updated_at")
+	insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", createdAtIdx), fmt.Sprintf("$%d", updatedAtIdx))
+
+	// Формируем UPDATE SET часть
+	var updates []string
+	updateParamIdx := 2 // Начинаем с поля после id
+	for _, field := range agg.Fields {
+		if field.Name == "id" || field.Name == "created_at" {
+			continue
+		}
+		updates = append(updates, fmt.Sprintf("%s = $%d", g.converter.ToSnakeCase(field.Name), updateParamIdx))
+		updateParamIdx++
+	}
+	updates = append(updates, fmt.Sprintf("updated_at = $%d", updatedAtIdx))
+
+	userContent.WriteString("\treturn fmt.Sprintf(`\n")
+	userContent.WriteString("\t\tINSERT INTO %s (" + strings.Join(insertFields, ", ") + ") \n")
+	userContent.WriteString("\t\tVALUES (" + strings.Join(insertPlaceholders, ", ") + ")\n")
+	userContent.WriteString("\t\tON CONFLICT (id) \n")
+	userContent.WriteString("\t\tDO UPDATE SET " + strings.Join(updates, ", ") + "\n")
+	userContent.WriteString("\t`, tableName)\n")
+	userContent.WriteString("}\n")
+
+	userPath := fmt.Sprintf("infrastructure/repository/%s_repository.go", g.converter.ToSnakeCase(agg.Name))
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // generateCacheService генерирует cache service
@@ -319,8 +356,30 @@ func (r *RedisCacheService) Exists(ctx context.Context, key string) (bool, error
 }
 `
 
-	path := "infrastructure/cache/redis_cache.go"
-	return g.writer.WriteFile(path, content)
+	path := "infrastructure/cache/redis_cache.gen.go"
+	if err := g.writer.WriteFile(path, content); err != nil {
+		return err
+	}
+
+	// Создаем пустой пользовательский файл для cache (если нужно добавить кастомную логику)
+	return g.generateCacheUserCode()
+}
+
+// generateCacheUserCode генерирует пустой пользовательский файл для cache
+func (g *InfrastructureGenerator) generateCacheUserCode() error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package cache\n\n")
+	userContent.WriteString("// Этот файл предназначен для расширения функциональности cache.\n")
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n")
+	userContent.WriteString("// Если вам нужно добавить кастомные методы или реализацию CacheService, определите их здесь.\n\n")
+	userContent.WriteString("// Пример:\n")
+	userContent.WriteString("// type CustomCacheService struct {\n")
+	userContent.WriteString("//     // Реализация CacheService\n")
+	userContent.WriteString("// }\n")
+
+	userPath := "infrastructure/cache/redis_cache.go"
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // generateMigrations генерирует SQL миграции в формате goose (единый файл с аннотациями -- +goose Up/Down)
@@ -517,8 +576,31 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 }
 `
 
-	path := "config/config.go"
-	return g.writer.WriteFile(path, content)
+	path := "config/config.gen.go"
+	if err := g.writer.WriteFile(path, content); err != nil {
+		return err
+	}
+
+	// Создаем пустой пользовательский файл для config (если нужно добавить кастомную конфигурацию)
+	return g.generateConfigUserCode()
+}
+
+// generateConfigUserCode генерирует пустой пользовательский файл для config
+func (g *InfrastructureGenerator) generateConfigUserCode() error {
+	var userContent strings.Builder
+
+	userContent.WriteString("package config\n\n")
+	userContent.WriteString("// Этот файл предназначен для расширения конфигурации.\n")
+	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n")
+	userContent.WriteString("// Если вам нужно добавить кастомные поля конфигурации или методы, определите их здесь.\n\n")
+	userContent.WriteString("// Пример:\n")
+	userContent.WriteString("// func (c *Config) Validate() error {\n")
+	userContent.WriteString("//     // Добавьте валидацию конфигурации\n")
+	userContent.WriteString("//     return nil\n")
+	userContent.WriteString("// }\n")
+
+	userPath := "config/config.go"
+	return g.writer.WriteFile(userPath, userContent.String())
 }
 
 // protoToGoType конвертирует proto тип в Go тип
