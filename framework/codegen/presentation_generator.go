@@ -177,8 +177,26 @@ func (g *PresentationGenerator) generateRESTHandlerUserCode(spec *ParsedSpec, co
 	userContent.WriteString("// Этот файл содержит пользовательские обработчики REST API.\n")
 	userContent.WriteString("// Вы можете свободно редактировать этот файл - он не будет перезаписан при регенерации.\n")
 	userContent.WriteString("// Здесь вы можете кастомизировать обработку запросов, добавить валидацию, логирование и т.д.\n\n")
+	// Проверяем, нужен ли импорт strconv для парсинга числовых значений
+	needsStrconv := false
+	for _, query := range spec.Queries {
+		for _, field := range query.RequestFields {
+			goType := g.protoToGoType(field.Type, field.Repeated)
+			if goType == "int32" || goType == "int64" {
+				needsStrconv = true
+				break
+			}
+		}
+		if needsStrconv {
+			break
+		}
+	}
+	
 	userContent.WriteString("import (\n")
 	userContent.WriteString("\t\"net/http\"\n")
+	if needsStrconv {
+		userContent.WriteString("\t\"strconv\"\n")
+	}
 	userContent.WriteString("\n")
 	userContent.WriteString("\t\"github.com/gin-gonic/gin\"\n")
 	userContent.WriteString(fmt.Sprintf("\t\"%s/application/command\"\n", config.ModulePath))
@@ -226,9 +244,7 @@ func (g *PresentationGenerator) generateCommandHandler(cmd CommandSpec) string {
 
 	// Для Delete команды не нужен JSON body
 	if !isDelete {
-		builder.WriteString("\tvar req struct {\n")
-		builder.WriteString("\t\t// Add request fields from command\n")
-		builder.WriteString("\t}\n\n")
+		builder.WriteString(fmt.Sprintf("\tvar req command.%sCommand\n", cmd.Name))
 		builder.WriteString("\tif err := c.ShouldBindJSON(&req); err != nil {\n")
 		builder.WriteString("\t\tc.JSON(http.StatusBadRequest, gin.H{\"error\": err.Error()})\n")
 		builder.WriteString("\t\treturn\n")
@@ -237,11 +253,31 @@ func (g *PresentationGenerator) generateCommandHandler(cmd CommandSpec) string {
 
 	builder.WriteString(fmt.Sprintf("\tcmd := command.%sCommand{\n", cmd.Name))
 	if needsID {
-		builder.WriteString("\t\t// TODO: Set ID field from URL parameter\n")
-		builder.WriteString("\t\t// ID: id,\n")
+		// Находим поле ID в RequestFields и устанавливаем его из URL параметра
+		hasIDField := false
+		for _, field := range cmd.RequestFields {
+			if strings.ToLower(field.Name) == "id" {
+				hasIDField = true
+				fieldName := g.toPublicField(field.Name)
+				builder.WriteString(fmt.Sprintf("\t\t%s: id,\n", fieldName))
+				break
+			}
+		}
+		if !hasIDField {
+			builder.WriteString("\t\t// TODO: Set ID field from URL parameter\n")
+			builder.WriteString("\t\t// ID: id,\n")
+		}
 	}
 	if !isDelete {
-		builder.WriteString("\t\t// Map request fields from req to command\n")
+		// Маппим поля из req в cmd
+		for _, field := range cmd.RequestFields {
+			fieldName := g.toPublicField(field.Name)
+			// Пропускаем ID для Update/Delete команд, так как он уже установлен из URL
+			if needsID && strings.ToLower(field.Name) == "id" {
+				continue
+			}
+			builder.WriteString(fmt.Sprintf("\t\t%s: req.%s,\n", fieldName, fieldName))
+		}
 	}
 	builder.WriteString("\t}\n\n")
 	builder.WriteString("\tif err := h.commandBus.Send(c.Request.Context(), cmd); err != nil {\n")
@@ -286,14 +322,64 @@ func (g *PresentationGenerator) generateQueryHandler(query QuerySpec) string {
 
 	builder.WriteString(fmt.Sprintf("\tq := query.%sQuery{\n", query.Name))
 	if isGet {
-		builder.WriteString("\t\t// TODO: Set ID field from URL parameter\n")
-		builder.WriteString("\t\t// ID: id,\n")
+		// Находим поле ID в RequestFields и устанавливаем его из URL параметра
+		hasIDField := false
+		for _, field := range query.RequestFields {
+			if strings.ToLower(field.Name) == "id" {
+				hasIDField = true
+				fieldName := g.toPublicField(field.Name)
+				builder.WriteString(fmt.Sprintf("\t\t%s: id,\n", fieldName))
+				break
+			}
+		}
+		if !hasIDField {
+			builder.WriteString("\t\t// TODO: Set ID field from URL parameter\n")
+			builder.WriteString("\t\t// ID: id,\n")
+		}
 	} else if isList {
-		builder.WriteString("\t\t// TODO: Map query parameters (limit, offset, filters, etc.)\n")
-		builder.WriteString("\t\t// Limit: c.DefaultQuery(\"limit\", \"10\"),\n")
-		builder.WriteString("\t\t// Offset: c.DefaultQuery(\"offset\", \"0\"),\n")
+		// Маппим query параметры из URL
+		for _, field := range query.RequestFields {
+			fieldName := g.toPublicField(field.Name)
+			fieldSnake := g.converter.ToSnakeCase(field.Name)
+			goType := g.protoToGoType(field.Type, field.Repeated)
+			if goType == "int32" || goType == "int64" {
+				builder.WriteString(fmt.Sprintf("\t\t%s: func() %s {\n", fieldName, goType))
+				builder.WriteString(fmt.Sprintf("\t\t\tval := c.DefaultQuery(\"%s\", \"0\")\n", fieldSnake))
+				builder.WriteString(fmt.Sprintf("\t\t\tif parsed, err := strconv.ParseInt(val, 10, 32); err == nil {\n"))
+				if goType == "int32" {
+					builder.WriteString("\t\t\t\treturn int32(parsed)\n")
+				} else {
+					builder.WriteString("\t\t\t\treturn parsed\n")
+				}
+				builder.WriteString("\t\t\t}\n")
+				builder.WriteString("\t\t\treturn 0\n")
+				builder.WriteString("\t\t}(),\n")
+			} else {
+				builder.WriteString(fmt.Sprintf("\t\t%s: c.DefaultQuery(\"%s\", \"\"),\n", fieldName, fieldSnake))
+			}
+		}
 	} else {
-		builder.WriteString("\t\t// Map query parameters to query\n")
+		// Маппим query параметры из URL для других типов запросов
+		for _, field := range query.RequestFields {
+			fieldName := g.toPublicField(field.Name)
+			fieldSnake := g.converter.ToSnakeCase(field.Name)
+			goType := g.protoToGoType(field.Type, field.Repeated)
+			if goType == "int32" || goType == "int64" {
+				builder.WriteString(fmt.Sprintf("\t\t%s: func() %s {\n", fieldName, goType))
+				builder.WriteString(fmt.Sprintf("\t\t\tval := c.Query(\"%s\")\n", fieldSnake))
+				builder.WriteString(fmt.Sprintf("\t\t\tif parsed, err := strconv.ParseInt(val, 10, 32); err == nil {\n"))
+				if goType == "int32" {
+					builder.WriteString("\t\t\t\treturn int32(parsed)\n")
+				} else {
+					builder.WriteString("\t\t\t\treturn parsed\n")
+				}
+				builder.WriteString("\t\t\t}\n")
+				builder.WriteString("\t\t\treturn 0\n")
+				builder.WriteString("\t\t}(),\n")
+			} else {
+				builder.WriteString(fmt.Sprintf("\t\t%s: c.Query(\"%s\"),\n", fieldName, fieldSnake))
+			}
+		}
 	}
 	builder.WriteString("\t}\n\n")
 	builder.WriteString("\tresult, err := h.queryBus.Ask(c.Request.Context(), q)\n")
@@ -632,4 +718,50 @@ func (g *PresentationGenerator) generateGraphQLAdapterUserCode(config *Generator
 
 	userPath := "presentation/graphql/adapter.go"
 	return g.writer.WriteFile(userPath, userContent.String())
+}
+
+// protoToGoType конвертирует proto тип в Go тип
+func (g *PresentationGenerator) protoToGoType(protoType string, repeated bool) string {
+	var goType string
+	switch protoType {
+	case "string":
+		goType = "string"
+	case "int32":
+		goType = "int32"
+	case "int64":
+		goType = "int64"
+	case "bool":
+		goType = "bool"
+	case "float64":
+		goType = "float64"
+	case "float32":
+		goType = "float32"
+	case "[]byte":
+		goType = "[]byte"
+	default:
+		// Для пользовательских типов (например, Item) возвращаем как есть
+		goType = protoType
+	}
+	
+	// Если поле repeated, добавляем слайс
+	if repeated {
+		return "[]" + goType
+	}
+	return goType
+}
+
+// toPublicField конвертирует имя поля в публичное (с заглавной буквы)
+func (g *PresentationGenerator) toPublicField(name string) string {
+	if len(name) == 0 {
+		return name
+	}
+	// Конвертируем snake_case в CamelCase
+	parts := strings.Split(name, "_")
+	var result strings.Builder
+	for _, part := range parts {
+		if len(part) > 0 {
+			result.WriteString(strings.ToUpper(part[:1]) + part[1:])
+		}
+	}
+	return result.String()
 }

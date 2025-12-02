@@ -50,6 +50,8 @@ type CommandSpec struct {
 	Aggregate      string
 	RequestType    string
 	ResponseType   string
+	RequestFields  []FieldSpec // Поля из Request сообщения
+	ResponseFields []FieldSpec // Поля из Response сообщения
 	Async          bool
 	Idempotent     bool
 	TimeoutSeconds int32
@@ -60,6 +62,8 @@ type QuerySpec struct {
 	Name            string
 	RequestType     string
 	ResponseType    string
+	RequestFields   []FieldSpec // Поля из Request сообщения
+	ResponseFields  []FieldSpec // Поля из Response сообщения
 	Cacheable       bool
 	CacheTTLSeconds int32
 	ReadModel       string
@@ -217,11 +221,22 @@ func (p *ProtoParser) ParseProtoFile(file *descriptorpb.FileDescriptorProto) (*P
 			// Извлечение опций команды
 			if cmdOpts := p.extractCommandOptions(method); cmdOpts != nil {
 				methodSpec.CommandOptions = cmdOpts
+				// Получаем поля из Request и Response сообщений
+				requestFields := []FieldSpec{}
+				responseFields := []FieldSpec{}
+				if reqMsg, ok := messageMap[methodSpec.RequestType]; ok {
+					requestFields = reqMsg.Fields
+				}
+				if respMsg, ok := messageMap[methodSpec.ResponseType]; ok {
+					responseFields = respMsg.Fields
+				}
 				spec.Commands = append(spec.Commands, CommandSpec{
 					Name:           *method.Name,
 					Aggregate:      cmdOpts.Aggregate,
 					RequestType:    methodSpec.RequestType,
 					ResponseType:   methodSpec.ResponseType,
+					RequestFields:  requestFields,
+					ResponseFields: responseFields,
 					Async:          cmdOpts.Async,
 					Idempotent:     cmdOpts.Idempotent,
 					TimeoutSeconds: cmdOpts.TimeoutSeconds,
@@ -231,10 +246,21 @@ func (p *ProtoParser) ParseProtoFile(file *descriptorpb.FileDescriptorProto) (*P
 			// Извлечение опций запроса
 			if queryOpts := p.extractQueryOptions(method); queryOpts != nil {
 				methodSpec.QueryOptions = queryOpts
+				// Получаем поля из Request и Response сообщений
+				requestFields := []FieldSpec{}
+				responseFields := []FieldSpec{}
+				if reqMsg, ok := messageMap[methodSpec.RequestType]; ok {
+					requestFields = reqMsg.Fields
+				}
+				if respMsg, ok := messageMap[methodSpec.ResponseType]; ok {
+					responseFields = respMsg.Fields
+				}
 				spec.Queries = append(spec.Queries, QuerySpec{
 					Name:            *method.Name,
 					RequestType:     methodSpec.RequestType,
 					ResponseType:    methodSpec.ResponseType,
+					RequestFields:   requestFields,
+					ResponseFields:  responseFields,
 					Cacheable:       queryOpts.Cacheable,
 					CacheTTLSeconds: queryOpts.CacheTTLSeconds,
 					ReadModel:       queryOpts.ReadModel,

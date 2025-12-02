@@ -74,8 +74,16 @@ func (g *ApplicationGenerator) generateCommand(cmd CommandSpec, _ *ParsedSpec, c
 	content.WriteString(fmt.Sprintf("// %s команда\n", cmdName))
 	content.WriteString(fmt.Sprintf("type %s struct {\n", cmdName))
 
-	// Поля из request типа (упрощенно - в реальности нужно парсить proto message)
-	content.WriteString("\t// Add fields from request message\n")
+	// Генерация полей из Request сообщения
+	if len(cmd.RequestFields) > 0 {
+		for _, field := range cmd.RequestFields {
+			goType := g.protoToGoType(field.Type, field.Repeated)
+			fieldName := g.toPublicField(field.Name)
+			content.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\"`\n", fieldName, goType, g.converter.ToSnakeCase(field.Name)))
+		}
+	} else {
+		content.WriteString("\t// No fields in request message\n")
+	}
 	content.WriteString("}\n\n")
 
 	content.WriteString(fmt.Sprintf("func (c %s) CommandName() string {\n", cmdName))
@@ -262,7 +270,17 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 		content.WriteString("\t\"time\"\n")
 	}
 	content.WriteString("\n")
-	if usesDomain {
+	// Проверяем, нужен ли импорт domain для Response полей
+	needsDomainForResponse := false
+	if len(query.ResponseFields) > 0 {
+		for _, field := range query.ResponseFields {
+			if g.isCustomType(field.Type) && g.isAggregateType(spec, field.Type) {
+				needsDomainForResponse = true
+				break
+			}
+		}
+	}
+	if usesDomain || needsDomainForResponse {
 		content.WriteString(fmt.Sprintf("\t\"%s/domain\"\n", config.ModulePath))
 	}
 	if query.Cacheable {
@@ -284,7 +302,17 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	queryName := fmt.Sprintf("%sQuery", query.Name)
 	content.WriteString(fmt.Sprintf("// %s запрос\n", queryName))
 	content.WriteString(fmt.Sprintf("type %s struct {\n", queryName))
-	content.WriteString("\t// Add fields from request message\n")
+
+	// Генерация полей из Request сообщения
+	if len(query.RequestFields) > 0 {
+		for _, field := range query.RequestFields {
+			goType := g.protoToGoType(field.Type, field.Repeated)
+			fieldName := g.toPublicField(field.Name)
+			content.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\"`\n", fieldName, goType, g.converter.ToSnakeCase(field.Name)))
+		}
+	} else {
+		content.WriteString("\t// No fields in request message\n")
+	}
 	content.WriteString("}\n\n")
 
 	content.WriteString(fmt.Sprintf("func (q %s) QueryName() string {\n", queryName))
@@ -295,7 +323,17 @@ func (g *ApplicationGenerator) generateQuery(query QuerySpec, spec *ParsedSpec, 
 	responseName := fmt.Sprintf("%sResponse", query.Name)
 	content.WriteString(fmt.Sprintf("// %s ответ на запрос\n", responseName))
 	content.WriteString(fmt.Sprintf("type %s struct {\n", responseName))
-	content.WriteString("\t// Add fields from response message\n")
+
+	// Генерация полей из Response сообщения
+	if len(query.ResponseFields) > 0 {
+		for _, field := range query.ResponseFields {
+			goType := g.protoToGoTypeForResponse(field.Type, field.Repeated, spec)
+			fieldName := g.toPublicField(field.Name)
+			content.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\"`\n", fieldName, goType, g.converter.ToSnakeCase(field.Name)))
+		}
+	} else {
+		content.WriteString("\t// No fields in response message\n")
+	}
 	content.WriteString("}\n\n")
 
 	// Генерация handler
@@ -535,4 +573,89 @@ func findAggregateByName(aggregates []AggregateSpec, name string) *AggregateSpec
 		}
 	}
 	return nil
+}
+
+// protoToGoType конвертирует proto тип в Go тип
+func (g *ApplicationGenerator) protoToGoType(protoType string, repeated bool) string {
+	var goType string
+	switch protoType {
+	case "string":
+		goType = "string"
+	case "int32":
+		goType = "int32"
+	case "int64":
+		goType = "int64"
+	case "bool":
+		goType = "bool"
+	case "float64":
+		goType = "float64"
+	case "float32":
+		goType = "float32"
+	case "[]byte":
+		goType = "[]byte"
+	default:
+		// Для пользовательских типов (например, Item) возвращаем как есть
+		goType = protoType
+	}
+
+	// Если поле repeated, добавляем слайс
+	if repeated {
+		return "[]" + goType
+	}
+	return goType
+}
+
+// toPublicField конвертирует имя поля в публичное (с заглавной буквы)
+func (g *ApplicationGenerator) toPublicField(name string) string {
+	if len(name) == 0 {
+		return name
+	}
+	// Конвертируем snake_case в CamelCase
+	parts := strings.Split(name, "_")
+	var result strings.Builder
+	for _, part := range parts {
+		if len(part) > 0 {
+			result.WriteString(strings.ToUpper(part[:1]) + part[1:])
+		}
+	}
+	return result.String()
+}
+
+// isCustomType проверяет, является ли тип пользовательским (не базовым типом)
+func (g *ApplicationGenerator) isCustomType(protoType string) bool {
+	basicTypes := map[string]bool{
+		"string":  true,
+		"int32":   true,
+		"int64":   true,
+		"bool":    true,
+		"float64": true,
+		"float32": true,
+		"[]byte":  true,
+	}
+	return !basicTypes[protoType]
+}
+
+// isAggregateType проверяет, является ли тип агрегатом
+func (g *ApplicationGenerator) isAggregateType(spec *ParsedSpec, protoType string) bool {
+	for _, agg := range spec.Aggregates {
+		if agg.Name == protoType {
+			return true
+		}
+	}
+	return false
+}
+
+// protoToGoTypeForResponse конвертирует proto тип в Go тип для Response полей
+func (g *ApplicationGenerator) protoToGoTypeForResponse(protoType string, repeated bool, spec *ParsedSpec) string {
+	// Если это пользовательский тип и он является агрегатом, используем domain.{TypeName}
+	if g.isCustomType(protoType) && g.isAggregateType(spec, protoType) {
+		goType := "domain." + protoType
+		if repeated {
+			return "[]" + goType
+		}
+		return goType
+	}
+
+	// Иначе используем стандартную конвертацию
+	return g.protoToGoType(protoType, repeated)
 }
