@@ -224,7 +224,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 			strings.ToLower(handlerName), cmd.Name, aggName))
 		content.WriteString(fmt.Sprintf("\tif err := commandBus.Register(%s); err != nil {\n",
 			strings.ToLower(handlerName)))
-		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %v\", err)\n", cmd.Name))
+		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %%v\", err)\n", cmd.Name))
 		content.WriteString("\t}\n")
 	}
 	content.WriteString("\n")
@@ -277,7 +277,7 @@ func (g *MainGenerator) generateMain(spec *ParsedSpec, config *GeneratorConfig) 
 
 		content.WriteString(fmt.Sprintf("\tif err := queryBus.Register(%s); err != nil {\n",
 			strings.ToLower(handlerName)))
-		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %v\", err)\n", query.Name))
+		content.WriteString(fmt.Sprintf("\t\tlog.Fatalf(\"Failed to register %s handler: %%v\", err)\n", query.Name))
 		content.WriteString("\t}\n")
 	}
 	content.WriteString("\n")
@@ -428,14 +428,28 @@ docker-down:
 	@echo "Stopping infrastructure services..."
 	@docker-compose down
 
-# Применение миграций
+# Применение миграций через goose
 migrate:
 	@echo "Waiting for PostgreSQL to be ready..."
 	@until PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c '\q' 2>/dev/null; do sleep 1; done
 	@echo "Creating database if it doesn't exist..."
 	@PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'db'" | grep -q 1 || PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c 'CREATE DATABASE db;'
-	@echo "Applying migrations..."
-	@PGPASSWORD=postgres psql -h localhost -U postgres -d db -f migrations/001_create_tables.sql
+	@echo "Applying migrations with goose..."
+	@which goose > /dev/null || (echo "goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest" && exit 1)
+	@goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/db?sslmode=disable" up
+	@echo "Migrations applied successfully"
+
+# Откат миграций через goose
+migrate-down:
+	@echo "Rolling back migrations..."
+	@which goose > /dev/null || (echo "goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest" && exit 1)
+	@goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/db?sslmode=disable" down
+	@echo "Migrations rolled back successfully"
+
+# Статус миграций через goose
+migrate-status:
+	@which goose > /dev/null || (echo "goose not found. Install with: go install github.com/pressly/goose/v3/cmd/goose@latest" && exit 1)
+	@goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/db?sslmode=disable" status
 
 # Запуск тестов
 test:
@@ -463,7 +477,9 @@ help:
 	@echo "  make build        - Build the binary"
 	@echo "  make docker-up    - Start infrastructure services"
 	@echo "  make docker-down  - Stop infrastructure services"
-	@echo "  make migrate      - Apply database migrations"
+	@echo "  make migrate        - Apply database migrations (goose)"
+	@echo "  make migrate-down    - Rollback database migrations (goose)"
+	@echo "  make migrate-status  - Show migration status (goose)"
 	@echo "  make test         - Run tests"
 	@echo "  make clean        - Clean build artifacts"
 	@echo "  make deps         - Initialize Go module dependencies"
