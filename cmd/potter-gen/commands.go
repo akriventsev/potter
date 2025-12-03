@@ -77,6 +77,7 @@ func runInit() {
 		codegen.NewInfrastructureGenerator(*outputDir),
 		codegen.NewPresentationGenerator(*outputDir),
 		codegen.NewMainGenerator(*outputDir),
+		codegen.NewSDKGenerator(*outputDir),
 	}
 
 		for _, gen := range generators {
@@ -177,6 +178,7 @@ func runGenerate() {
 		codegen.NewInfrastructureGenerator(*outputDir),
 		codegen.NewPresentationGenerator(*outputDir),
 		codegen.NewMainGenerator(*outputDir),
+		codegen.NewSDKGenerator(*outputDir),
 	}
 
 		for _, gen := range generators {

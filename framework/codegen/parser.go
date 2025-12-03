@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/encoding/protowire"
@@ -757,7 +758,11 @@ func (p *ProtoParser) toSnakeCase(s string) string {
 		if i > 0 && r >= 'A' && r <= 'Z' {
 			result = append(result, '_')
 		}
-		result = append(result, r)
+		if r >= 'A' && r <= 'Z' {
+			result = append(result, r+32) // to lowercase
+		} else {
+			result = append(result, r)
+		}
 	}
-	return string(result)
+	return strings.ToLower(string(result))
 }
