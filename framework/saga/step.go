@@ -383,12 +383,17 @@ func NewParallelStep(name string, steps ...SagaStep) *ParallelStep {
 			}(i, step)
 		}
 
-		// Собираем результаты
+		// Собираем результаты с учетом отмены контекста
 		var errors []error
 		for i := 0; i < len(steps); i++ {
-			result := <-resultCh
-			if result.err != nil {
-				errors = append(errors, fmt.Errorf("step %s failed: %w", steps[result.index].Name(), result.err))
+			select {
+			case result := <-resultCh:
+				if result.err != nil {
+					errors = append(errors, fmt.Errorf("step %s failed: %w", steps[result.index].Name(), result.err))
+				}
+			case <-ctx.Done():
+				// Контекст отменен - возвращаем ошибку немедленно
+				return fmt.Errorf("parallel execution cancelled: %w", ctx.Err())
 			}
 		}
 
@@ -416,12 +421,17 @@ func NewParallelStep(name string, steps ...SagaStep) *ParallelStep {
 			}(i, steps[i])
 		}
 
-		// Собираем результаты
+		// Собираем результаты с учетом отмены контекста
 		var errors []error
 		for i := 0; i < len(steps); i++ {
-			result := <-resultCh
-			if result.err != nil {
-				errors = append(errors, fmt.Errorf("compensation for step %s failed: %w", steps[result.index].Name(), result.err))
+			select {
+			case result := <-resultCh:
+				if result.err != nil {
+					errors = append(errors, fmt.Errorf("compensation for step %s failed: %w", steps[result.index].Name(), result.err))
+				}
+			case <-ctx.Done():
+				// Контекст отменен - возвращаем ошибку немедленно
+				return fmt.Errorf("parallel compensation cancelled: %w", ctx.Err())
 			}
 		}
 

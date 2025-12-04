@@ -16,6 +16,9 @@ type InMemoryEventBus struct {
 	dlq        DeadLetterQueue
 	mu         sync.RWMutex
 	shutdown   chan struct{}
+	wg         sync.WaitGroup // для отслеживания активных публикаций
+	shutdownMu sync.Mutex
+	stopped    bool
 }
 
 // EventMiddleware middleware для событий
@@ -61,6 +64,18 @@ func (b *InMemoryEventBus) WithDeadLetterQueue(dlq DeadLetterQueue) *InMemoryEve
 
 // Publish публикует событие
 func (b *InMemoryEventBus) Publish(ctx context.Context, event Event) error {
+	// Проверяем, не остановлена ли шина
+	b.shutdownMu.Lock()
+	if b.stopped {
+		b.shutdownMu.Unlock()
+		return fmt.Errorf("event bus is stopped")
+	}
+	b.shutdownMu.Unlock()
+
+	// Инкрементируем WaitGroup для отслеживания активных публикаций
+	b.wg.Add(1)
+	defer b.wg.Done()
+
 	// Применяем middleware
 	next := func(ctx context.Context, event Event) error {
 		return b.publisher.Publish(ctx, event)
@@ -104,14 +119,30 @@ func (b *InMemoryEventBus) Replay(ctx context.Context, events []Event) error {
 
 // Shutdown корректно завершает работу шины
 func (b *InMemoryEventBus) Shutdown(ctx context.Context) error {
+	b.shutdownMu.Lock()
+	if b.stopped {
+		b.shutdownMu.Unlock()
+		return nil // Идемпотентный вызов
+	}
+	b.stopped = true
+	close(b.shutdown)
+	b.shutdownMu.Unlock()
+
+	// Ждем завершения всех активных публикаций
+	done := make(chan struct{})
+	go func() {
+		b.wg.Wait()
+		close(done)
+	}()
+
 	select {
-	case <-b.shutdown:
+	case <-done:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-time.After(30 * time.Second):
-		close(b.shutdown)
-		return nil
+		// Жесткий таймаут после ожидания активных публикаций
+		return fmt.Errorf("shutdown timeout after waiting for active publications")
 	}
 }
 

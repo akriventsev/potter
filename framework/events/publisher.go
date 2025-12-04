@@ -91,12 +91,35 @@ func (p *InMemoryEventPublisher) retryPublish(ctx context.Context, event Event, 
 func (p *InMemoryEventPublisher) Publish(ctx context.Context, event Event) error {
 	p.mu.RLock()
 	handlers := p.subscribers[event.EventType()]
+	ordered := p.ordered
 	p.mu.RUnlock()
 
 	if len(handlers) == 0 {
 		return nil
 	}
 
+	// Если включена упорядоченная доставка, обрабатываем последовательно
+	if ordered {
+		var errors []error
+		for _, handler := range handlers {
+			var err error
+			if p.retryConfig != nil {
+				err = p.retryPublish(ctx, event, handler)
+			} else {
+				err = handler.Handle(ctx, event)
+			}
+			if err != nil {
+				errors = append(errors, fmt.Errorf("handler %s failed: %w", handler.EventType(), err))
+			}
+		}
+
+		if len(errors) > 0 {
+			return fmt.Errorf("publish failed: %v", errors)
+		}
+		return nil
+	}
+
+	// Параллельная обработка (по умолчанию)
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(handlers))
 

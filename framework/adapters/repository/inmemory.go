@@ -26,6 +26,7 @@ type InMemoryRepository[T Entity] struct {
 	config   InMemoryConfig
 	entities map[string]T
 	indexes  map[string]map[string][]string // index name -> key -> entity IDs
+	keyFuncs map[string]func(T) string      // index name -> key function
 	mu       sync.RWMutex
 }
 
@@ -35,6 +36,7 @@ func NewInMemoryRepository[T Entity](config InMemoryConfig) *InMemoryRepository[
 		config:   config,
 		entities: make(map[string]T),
 		indexes:  make(map[string]map[string][]string),
+		keyFuncs: make(map[string]func(T) string),
 	}
 }
 
@@ -58,7 +60,52 @@ func (r *InMemoryRepository[T]) Save(ctx context.Context, entity T) error {
 		}
 	}
 
+	// Удаляем старую сущность из индексов, если она существует
+	if oldEntity, exists := r.entities[id]; exists {
+		for indexName, keyFunc := range r.keyFuncs {
+			oldKey := keyFunc(oldEntity)
+			if index, ok := r.indexes[indexName]; ok {
+				if ids, ok := index[oldKey]; ok {
+					// Удаляем ID из списка
+					newIds := make([]string, 0, len(ids))
+					for _, existingID := range ids {
+						if existingID != id {
+							newIds = append(newIds, existingID)
+						}
+					}
+					if len(newIds) == 0 {
+						delete(index, oldKey)
+					} else {
+						index[oldKey] = newIds
+					}
+				}
+			}
+		}
+	}
+
+	// Сохраняем сущность
 	r.entities[id] = entity
+
+	// Обновляем индексы для новой сущности
+	for indexName, keyFunc := range r.keyFuncs {
+		key := keyFunc(entity)
+		if r.indexes[indexName] == nil {
+			r.indexes[indexName] = make(map[string][]string)
+		}
+		ids := r.indexes[indexName][key]
+		// Проверяем, что ID еще не добавлен
+		found := false
+		for _, existingID := range ids {
+			if existingID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			r.indexes[indexName][key] = append(ids, id)
+		}
+	}
+
 	return nil
 }
 
@@ -94,8 +141,30 @@ func (r *InMemoryRepository[T]) Delete(ctx context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.entities[id]; !exists {
+	entity, exists := r.entities[id]
+	if !exists {
 		return fmt.Errorf("entity not found: %s", id)
+	}
+
+	// Удаляем из индексов
+	for indexName, keyFunc := range r.keyFuncs {
+		key := keyFunc(entity)
+		if index, ok := r.indexes[indexName]; ok {
+			if ids, ok := index[key]; ok {
+				// Удаляем ID из списка
+				newIds := make([]string, 0, len(ids))
+				for _, existingID := range ids {
+					if existingID != id {
+						newIds = append(newIds, existingID)
+					}
+				}
+				if len(newIds) == 0 {
+					delete(index, key)
+				} else {
+					index[key] = newIds
+				}
+			}
+		}
 	}
 
 	delete(r.entities, id)
@@ -122,6 +191,9 @@ func (r *InMemoryRepository[T]) AddIndex(name string, keyFunc func(T) string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Сохраняем функцию построения ключей
+	r.keyFuncs[name] = keyFunc
+
 	if r.indexes[name] == nil {
 		r.indexes[name] = make(map[string][]string)
 	}
@@ -130,8 +202,17 @@ func (r *InMemoryRepository[T]) AddIndex(name string, keyFunc func(T) string) {
 	for id, entity := range r.entities {
 		key := keyFunc(entity)
 		ids := r.indexes[name][key]
-		ids = append(ids, id)
-		r.indexes[name][key] = ids
+		// Проверяем, что ID еще не добавлен
+		found := false
+		for _, existingID := range ids {
+			if existingID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			r.indexes[name][key] = append(ids, id)
+		}
 	}
 }
 
@@ -174,6 +255,7 @@ func (r *InMemoryRepository[T]) Clear(ctx context.Context) error {
 
 	r.entities = make(map[string]T)
 	r.indexes = make(map[string]map[string][]string)
+	r.keyFuncs = make(map[string]func(T) string)
 	return nil
 }
 

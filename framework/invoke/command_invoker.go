@@ -130,10 +130,15 @@ func (i *CommandInvoker[TCommand, TSuccessEvent, TErrorEvent]) Invoke(ctx contex
 
 	// Если errorEventType не указан, используем старый подход (только успешное событие)
 	if i.errorEventType == "" {
+		// Создаем дочерний контекст с таймаутом для горутины ожидания
+		waitCtx, waitCancel := context.WithTimeout(ctx, i.timeout)
+		defer waitCancel() // Гарантируем отмену при любом исходе
+
 		// Регистрируем awaiter для ожидания события
 		eventCh := make(chan core.Result[TSuccessEvent], 1)
 		go func() {
-			event, err := i.eventAwaiter.Await(ctx, correlationID, i.successEventType, i.timeout)
+			defer waitCancel() // Дополнительная гарантия отмены при завершении горутины
+			event, err := i.eventAwaiter.Await(waitCtx, correlationID, i.successEventType, i.timeout)
 			if err != nil {
 				eventCh <- core.Err[TSuccessEvent](err)
 				return
@@ -154,6 +159,7 @@ func (i *CommandInvoker[TCommand, TSuccessEvent, TErrorEvent]) Invoke(ctx contex
 
 		// Публикуем команду (pure produce)
 		if err := i.commandBus.SendAsync(ctx, cmd, metadata); err != nil {
+			waitCancel()
 			i.eventAwaiter.Cancel(correlationID)
 			return zero, err
 		}
@@ -161,24 +167,35 @@ func (i *CommandInvoker[TCommand, TSuccessEvent, TErrorEvent]) Invoke(ctx contex
 		// Ожидаем событие с timeout
 		select {
 		case result := <-eventCh:
+			waitCancel()
 			if result.IsErr() {
 				return zero, result.Error
 			}
 			return result.Value, nil
 		case <-ctx.Done():
+			waitCancel()
 			i.eventAwaiter.Cancel(correlationID)
 			return zero, ctx.Err()
-		case <-time.After(i.timeout):
+		case <-waitCtx.Done():
+			waitCancel()
 			i.eventAwaiter.Cancel(correlationID)
-			return zero, NewEventTimeoutError(correlationID, i.timeout.String())
+			if waitCtx.Err() == context.DeadlineExceeded {
+				return zero, NewEventTimeoutError(correlationID, i.timeout.String())
+			}
+			return zero, waitCtx.Err()
 		}
 	}
 
 	// Поддержка ошибочных событий: ожидаем любое из двух событий
+	// Создаем дочерний контекст с таймаутом для горутины ожидания
+	waitCtx, waitCancel := context.WithTimeout(ctx, i.timeout)
+	defer waitCancel() // Гарантируем отмену при любом исходе
+
 	eventTypes := []string{i.successEventType, i.errorEventType}
 	eventCh := make(chan core.Result[TSuccessEvent], 1)
 	go func() {
-		event, receivedType, err := i.eventAwaiter.AwaitAny(ctx, correlationID, eventTypes, i.timeout)
+		defer waitCancel() // Дополнительная гарантия отмены при завершении горутины
+		event, receivedType, err := i.eventAwaiter.AwaitAny(waitCtx, correlationID, eventTypes, i.timeout)
 		if err != nil {
 			eventCh <- core.Err[TSuccessEvent](err)
 			return
@@ -210,6 +227,7 @@ func (i *CommandInvoker[TCommand, TSuccessEvent, TErrorEvent]) Invoke(ctx contex
 
 	// Публикуем команду (pure produce)
 	if err := i.commandBus.SendAsync(ctx, cmd, metadata); err != nil {
+		waitCancel()
 		i.eventAwaiter.Cancel(correlationID)
 		return zero, err
 	}
@@ -217,16 +235,22 @@ func (i *CommandInvoker[TCommand, TSuccessEvent, TErrorEvent]) Invoke(ctx contex
 	// Ожидаем событие с timeout
 	select {
 	case result := <-eventCh:
+		waitCancel()
 		if result.IsErr() {
 			return zero, result.Error
 		}
 		return result.Value, nil
 	case <-ctx.Done():
+		waitCancel()
 		i.eventAwaiter.Cancel(correlationID)
 		return zero, ctx.Err()
-	case <-time.After(i.timeout):
+	case <-waitCtx.Done():
+		waitCancel()
 		i.eventAwaiter.Cancel(correlationID)
-		return zero, NewEventTimeoutError(correlationID, i.timeout.String())
+		if waitCtx.Err() == context.DeadlineExceeded {
+			return zero, NewEventTimeoutError(correlationID, i.timeout.String())
+		}
+		return zero, waitCtx.Err()
 	}
 }
 

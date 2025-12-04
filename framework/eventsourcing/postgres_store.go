@@ -2,7 +2,6 @@ package eventsourcing
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -116,17 +115,14 @@ func (s *PostgresEventStore) AppendEvents(ctx context.Context, aggregateID strin
 	defer tx.Rollback(ctx)
 
 	// Проверяем текущую версию
-	var currentVersion sql.NullInt64
-	checkQuery := fmt.Sprintf("SELECT MAX(version) FROM %s WHERE aggregate_id = $1", tableName)
+	var currentVersion int64
+	checkQuery := fmt.Sprintf("SELECT COALESCE(MAX(version), 0) FROM %s WHERE aggregate_id = $1", tableName)
 	err = tx.QueryRow(ctx, checkQuery, aggregateID).Scan(&currentVersion)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil {
 		return fmt.Errorf("failed to check version: %w", err)
 	}
 
-	actualVersion := int64(0)
-	if currentVersion.Valid {
-		actualVersion = currentVersion.Int64
-	}
+	actualVersion := currentVersion
 
 	// Проверяем оптимистичную конкурентность
 	if expectedVersion != actualVersion {
@@ -223,9 +219,11 @@ func (s *PostgresEventStore) GetEvents(ctx context.Context, aggregateID string, 
 			// Это fallback для обратной совместимости
 			var baseEvent events.BaseEvent
 			if err := json.Unmarshal(eventDataJSON, &baseEvent); err == nil {
-				// Создаем минимальное событие для обратной совместимости
-				// В production всегда должен быть установлен десериализатор
+				// Присваиваем десериализованное событие для избежания nil в репозиториях
+				stored.EventData = &baseEvent
 			}
+			// ВАЖНО: Для корректного восстановления агрегатов необходимо настроить десериализатор
+			// через NewPostgresEventStoreWithDeserializer
 		}
 		result = append(result, stored)
 	}
@@ -434,7 +432,7 @@ func (s *PostgresSnapshotStore) GetSnapshot(ctx context.Context, aggregateID str
 		&snapshot.CreatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get snapshot: %w", err)

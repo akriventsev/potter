@@ -117,7 +117,10 @@ func (h *SagaCommandHandler) Handle(ctx context.Context, cmd transport.Command) 
 	}
 
 	// Создаем instance саги
-	instance := definition.CreateInstance(ctx, sagaCtx)
+	instance, err := definition.CreateInstance(ctx, sagaCtx)
+	if err != nil {
+		return fmt.Errorf("failed to create saga instance: %w", err)
+	}
 
 	// Запускаем выполнение через orchestrator
 	return h.orchestrator.Execute(ctx, instance)

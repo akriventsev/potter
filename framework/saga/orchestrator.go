@@ -75,13 +75,21 @@ func (o *DefaultOrchestrator) StartSaga(ctx context.Context, definitionName stri
 	// Создаем instance с persistence и eventBus
 	var instance Saga
 	if baseDef, ok := definition.(*BaseSagaDefinition); ok {
-		instance = baseDef.CreateInstanceWithPersistenceAndEventBus(ctx, sagaCtx, o.persistence, o.eventBus)
+		var createErr error
+		instance, createErr = baseDef.CreateInstanceWithPersistenceAndEventBus(ctx, sagaCtx, o.persistence, o.eventBus)
+		if createErr != nil {
+			return nil, fmt.Errorf("failed to create saga instance: %w", createErr)
+		}
 	} else {
-		instance = definition.CreateInstance(ctx, sagaCtx)
+		var createErr error
+		instance, createErr = definition.CreateInstance(ctx, sagaCtx)
+		if createErr != nil {
+			return nil, fmt.Errorf("failed to create saga instance: %w", createErr)
+		}
 	}
 
 	if instance == nil {
-		return nil, fmt.Errorf("failed to create saga instance")
+		return nil, fmt.Errorf("failed to create saga instance: returned nil")
 	}
 
 	sagaID := instance.ID()

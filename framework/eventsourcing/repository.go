@@ -3,6 +3,7 @@ package eventsourcing
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/akriventsev/potter/framework/events"
@@ -238,7 +239,20 @@ func (r *EventSourcedRepository[T]) createSnapshot(ctx context.Context, aggregat
 
 // getAggregateTypeName получает имя типа агрегата
 func getAggregateTypeName(aggregate interface{}) string {
-	// В реальной реализации можно использовать рефлексию
-	return "aggregate"
+	if aggregate == nil {
+		return "aggregate"
+	}
+
+	t := reflect.TypeOf(aggregate)
+	// Обрабатываем указатели
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// Возвращаем полное имя типа с пакетом для уникальности
+	if t.PkgPath() != "" {
+		return t.PkgPath() + "." + t.Name()
+	}
+	return t.Name()
 }
 

@@ -189,9 +189,9 @@ func (r *SagaRegistry) CreateInstanceWithPersistence(ctx context.Context, name s
 		return nil, err
 	}
 	if baseDef, ok := definition.(*BaseSagaDefinition); ok {
-		return baseDef.CreateInstanceWithPersistence(ctx, sagaCtx, persistence), nil
+		return baseDef.CreateInstanceWithPersistence(ctx, sagaCtx, persistence)
 	}
-	return definition.CreateInstance(ctx, sagaCtx), nil
+	return definition.CreateInstance(ctx, sagaCtx)
 }
 
 // ListSagas возвращает список всех зарегистрированных саг

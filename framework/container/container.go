@@ -87,6 +87,7 @@ func Set[T any](c *Container, key string, value T) error {
 }
 
 // SetWithScope устанавливает зависимость с указанной областью видимости
+// Для ScopeScoped использует "default" scopeID. Для явного указания scopeID используйте SetInScope.
 func SetWithScope[T any](c *Container, key string, value T, scope DependencyScope) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -98,7 +99,9 @@ func SetWithScope[T any](c *Container, key string, value T, scope DependencyScop
 		}
 		c.dependencies[key] = value
 	case ScopeScoped:
-		scopeID := "default" // В реальной реализации можно использовать request ID
+		// Используем "default" scopeID для обратной совместимости
+		// Для явного указания scopeID используйте SetInScope
+		scopeID := "default"
 		if c.scopes[scopeID] == nil {
 			c.scopes[scopeID] = make(map[string]interface{})
 		}
@@ -110,6 +113,24 @@ func SetWithScope[T any](c *Container, key string, value T, scope DependencyScop
 		// Transient зависимости не сохраняются, создаются каждый раз заново
 		return fmt.Errorf("transient dependencies must be registered with factory function")
 	}
+	return nil
+}
+
+// SetInScope устанавливает зависимость в указанную область видимости (scope)
+func SetInScope[T any](c *Container, key string, value T, scopeID string) error {
+	if scopeID == "" {
+		return fmt.Errorf("scopeID cannot be empty")
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.scopes[scopeID] == nil {
+		c.scopes[scopeID] = make(map[string]interface{})
+	}
+	if _, exists := c.scopes[scopeID][key]; exists {
+		return fmt.Errorf("dependency %s already registered in scope %s", key, scopeID)
+	}
+	c.scopes[scopeID][key] = value
 	return nil
 }
 

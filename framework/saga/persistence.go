@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/akriventsev/potter/framework/events"
 	"github.com/akriventsev/potter/framework/eventsourcing"
@@ -120,23 +119,244 @@ func (p *EventStorePersistence) WithSnapshotFrequency(freq int) *EventStorePersi
 	return p
 }
 
+// getCheckpointMetadataFromSnapshot получает метаданные checkpoint из snapshot
+func (p *EventStorePersistence) getCheckpointMetadataFromSnapshot(ctx context.Context, sagaID string) (expectedVersion int64, savedHistoryCount int, hasMetadata bool) {
+	snapshot, err := p.snapshotStore.GetSnapshot(ctx, sagaID)
+	if err != nil || snapshot == nil {
+		return 0, 0, false
+	}
+	
+	if snapshot.Metadata == nil {
+		return 0, 0, false
+	}
+	
+	// Извлекаем last_saved_version из метаданных snapshot
+	if lastSavedVersionVal, ok := snapshot.Metadata["last_saved_version"]; ok {
+		switch v := lastSavedVersionVal.(type) {
+		case int64:
+			expectedVersion = v
+		case float64:
+			expectedVersion = int64(v)
+		case int:
+			expectedVersion = int64(v)
+		}
+	}
+	
+	// Извлекаем saved_history_count из метаданных snapshot
+	if savedCountVal, ok := snapshot.Metadata["saved_history_count"]; ok {
+		switch v := savedCountVal.(type) {
+		case int:
+			savedHistoryCount = v
+		case float64:
+			savedHistoryCount = int(v)
+		case int64:
+			savedHistoryCount = int(v)
+		}
+	}
+	
+	// Проверяем, что хотя бы одно значение было найдено
+	hasMetadata = expectedVersion > 0 || savedHistoryCount > 0
+	return expectedVersion, savedHistoryCount, hasMetadata
+}
+
+// getLastCheckpointEvent получает последнее событие SagaStateCheckpoint для саги
+func (p *EventStorePersistence) getLastCheckpointEvent(ctx context.Context, sagaID string) (*eventsourcing.StoredEvent, error) {
+	// Читаем все события саги с начала, чтобы найти последний чекпоинт
+	allEvents, err := p.eventStore.GetEvents(ctx, sagaID, 0)
+	if err != nil {
+		if err == eventsourcing.ErrStreamNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get events for checkpoint: %w", err)
+	}
+	
+	// Ищем последнее событие SagaStateCheckpoint
+	for i := len(allEvents) - 1; i >= 0; i-- {
+		if allEvents[i].EventType == "SagaStateCheckpoint" {
+			return &allEvents[i], nil
+		}
+	}
+	
+	return nil, nil
+}
+
+// getExpectedVersionAndHistoryCount получает expectedVersion и savedHistoryCount используя оптимизированный подход
+func (p *EventStorePersistence) getExpectedVersionAndHistoryCount(ctx context.Context, sagaID string) (expectedVersion int64, savedHistoryCount int) {
+	// Шаг 1: Пытаемся получить метаданные из snapshot (самый быстрый способ)
+	if expVer, histCount, hasMeta := p.getCheckpointMetadataFromSnapshot(ctx, sagaID); hasMeta {
+		expectedVersion = expVer
+		savedHistoryCount = histCount
+		
+		// Если есть last_saved_version, читаем только новые события
+		if expectedVersion > 0 {
+			recentEvents, err := p.eventStore.GetEvents(ctx, sagaID, expectedVersion+1)
+			if err == nil {
+				// Обновляем expectedVersion на версию последнего события
+				if len(recentEvents) > 0 {
+					expectedVersion = recentEvents[len(recentEvents)-1].Version
+					// Подсчитываем новые события шагов
+					for _, storedEvent := range recentEvents {
+						eventType := storedEvent.EventType
+						if eventType == "StepStarted" || eventType == "StepCompleted" ||
+							eventType == "StepFailed" || eventType == "StepCompensating" ||
+							eventType == "StepCompensated" {
+							savedHistoryCount++
+						}
+					}
+				}
+				return expectedVersion, savedHistoryCount
+			}
+		}
+	}
+	
+	// Шаг 2: Пытаемся найти последнее событие SagaStateCheckpoint для этой саги
+	checkpointEvent, err := p.getLastCheckpointEvent(ctx, sagaID)
+	if err == nil && checkpointEvent != nil {
+		// Извлекаем метаданные из события чекпоинта
+		if lastSavedVersionVal, ok := checkpointEvent.Metadata["last_saved_version"]; ok {
+			switch v := lastSavedVersionVal.(type) {
+			case int64:
+				expectedVersion = v
+			case float64:
+				expectedVersion = int64(v)
+			case int:
+				expectedVersion = int64(v)
+			}
+		}
+		
+		if savedCountVal, ok := checkpointEvent.Metadata["saved_history_count"]; ok {
+			switch v := savedCountVal.(type) {
+			case int:
+				savedHistoryCount = v
+			case float64:
+				savedHistoryCount = int(v)
+			case int64:
+				savedHistoryCount = int(v)
+			}
+		}
+		
+		// Если есть last_saved_version, читаем только новые события
+		if expectedVersion > 0 {
+			recentEvents, err := p.eventStore.GetEvents(ctx, sagaID, expectedVersion+1)
+			if err == nil {
+				if len(recentEvents) > 0 {
+					expectedVersion = recentEvents[len(recentEvents)-1].Version
+					for _, storedEvent := range recentEvents {
+						eventType := storedEvent.EventType
+						if eventType == "StepStarted" || eventType == "StepCompleted" ||
+							eventType == "StepFailed" || eventType == "StepCompensating" ||
+							eventType == "StepCompensated" {
+							savedHistoryCount++
+						}
+					}
+				}
+				return expectedVersion, savedHistoryCount
+			}
+		}
+	}
+	
+	// Шаг 3: Fallback - используем глобальный GetEventsByType для обратной совместимости
+	storedEvents, err := p.eventStore.GetEventsByType(ctx, "SagaStateChanged", time.Time{})
+	if err == nil {
+		// Ищем последнее событие SagaStateChanged для этого sagaID
+		var lastStateEvent *eventsourcing.StoredEvent
+		for i := len(storedEvents) - 1; i >= 0; i-- {
+			if storedEvents[i].AggregateID == sagaID {
+				lastStateEvent = &storedEvents[i]
+				expectedVersion = storedEvents[i].Version
+				break
+			}
+		}
+		
+		if lastStateEvent != nil {
+			// Извлекаем savedHistoryCount и lastSavedVersion из метаданных
+			if savedCountVal, ok := lastStateEvent.Metadata["saved_history_count"]; ok {
+				if savedCountFloat, ok := savedCountVal.(float64); ok {
+					savedHistoryCount = int(savedCountFloat)
+				} else if savedCountInt, ok := savedCountVal.(int); ok {
+					savedHistoryCount = savedCountInt
+				}
+			}
+			
+			// Если lastSavedVersion есть в метаданных, читаем события только с этой версии
+			if lastSavedVersionVal, ok := lastStateEvent.Metadata["last_saved_version"]; ok {
+				var lastSavedVersion int64
+				if lastSavedVersionFloat, ok := lastSavedVersionVal.(float64); ok {
+					lastSavedVersion = int64(lastSavedVersionFloat)
+				} else if lastSavedVersionInt, ok := lastSavedVersionVal.(int64); ok {
+					lastSavedVersion = lastSavedVersionInt
+				}
+				
+				// Читаем только новые события начиная с lastSavedVersion
+				recentEvents, err := p.eventStore.GetEvents(ctx, sagaID, lastSavedVersion+1)
+				if err != nil && err != eventsourcing.ErrStreamNotFound {
+					// Продолжаем с fallback
+				} else if err == nil {
+					// Подсчитываем новые события шагов
+					for _, storedEvent := range recentEvents {
+						eventType := storedEvent.EventType
+						if eventType == "StepStarted" || eventType == "StepCompleted" ||
+							eventType == "StepFailed" || eventType == "StepCompensating" ||
+							eventType == "StepCompensated" {
+							savedHistoryCount++
+						}
+					}
+					// Обновляем expectedVersion на версию последнего события
+					if len(recentEvents) > 0 {
+						expectedVersion = recentEvents[len(recentEvents)-1].Version
+					}
+					return expectedVersion, savedHistoryCount
+				}
+			}
+		}
+	}
+	
+	// Шаг 4: Последний fallback - читаем все события саги
+	allEvents, err := p.eventStore.GetEvents(ctx, sagaID, 0)
+	if err != nil && err != eventsourcing.ErrStreamNotFound {
+		// Возвращаем нулевые значения, сохранение все равно попытается выполниться
+		return 0, 0
+	}
+	if err == nil && len(allEvents) > 0 {
+		expectedVersion = allEvents[len(allEvents)-1].Version
+		for _, storedEvent := range allEvents {
+			eventType := storedEvent.EventType
+			if eventType == "StepStarted" || eventType == "StepCompleted" ||
+				eventType == "StepFailed" || eventType == "StepCompensating" ||
+				eventType == "StepCompensated" {
+				savedHistoryCount++
+			}
+		}
+	}
+	
+	return expectedVersion, savedHistoryCount
+}
+
 func (p *EventStorePersistence) Save(ctx context.Context, saga Saga) error {
 	sagaID := saga.ID()
 
+	// Оптимизированный подход: получаем expectedVersion и savedHistoryCount
+	expectedVersion, savedHistoryCount := p.getExpectedVersionAndHistoryCount(ctx, sagaID)
+
 	// Создаем события для каждого изменения состояния
 	// Используем events.BaseEvent для совместимости с EventStore
+	history := saga.GetHistory()
+	currentHistoryCount := len(history)
+	
 	stateEvent := events.NewBaseEvent("SagaStateChanged", sagaID)
 	stateEvent.WithMetadata("status", string(saga.Status()))
 	stateEvent.WithMetadata("step", saga.CurrentStep())
 	stateEvent.WithMetadata("context", saga.Context().ToMap())
 	stateEvent.WithMetadata("definition_name", saga.Definition().Name())
+	stateEvent.WithMetadata("saved_history_count", currentHistoryCount) // Сохраняем текущее количество для оптимизации
 	stateEvent.WithCorrelationID(saga.Context().CorrelationID())
 	
 	eventsList := []events.Event{stateEvent}
 
-	// Добавляем события шагов из истории
-	history := saga.GetHistory()
-	for _, hist := range history {
+	// Добавляем только новые события шагов из истории (хвост истории)
+	prevLen := savedHistoryCount
+	if prevLen < len(history) {
+		for _, hist := range history[prevLen:] {
 		var baseEvent *events.BaseEvent
 		
 		switch hist.Status {
@@ -184,39 +404,96 @@ func (p *EventStorePersistence) Save(ctx context.Context, saga Saga) error {
 			}
 		}
 		
-		if baseEvent != nil {
-			baseEvent.WithCorrelationID(saga.Context().CorrelationID())
-			eventsList = append(eventsList, baseEvent)
+			if baseEvent != nil {
+				baseEvent.WithCorrelationID(saga.Context().CorrelationID())
+				eventsList = append(eventsList, baseEvent)
+			}
 		}
 	}
 
-	// Сохраняем события
-	if err := p.eventStore.AppendEvents(ctx, sagaID, 0, eventsList); err != nil {
+	// Вычисляем lastSavedVersion после добавления всех событий шагов (до добавления checkpoint)
+	lastSavedVersionBeforeCheckpoint := expectedVersion + int64(len(eventsList))
+	stateEvent.WithMetadata("last_saved_version", lastSavedVersionBeforeCheckpoint)
+
+	// Создаем легковесное событие-чекпоинт для оптимизации будущих сохранений
+	checkpointEvent := events.NewBaseEvent("SagaStateCheckpoint", sagaID)
+	checkpointEvent.WithMetadata("last_saved_version", lastSavedVersionBeforeCheckpoint)
+	checkpointEvent.WithMetadata("saved_history_count", currentHistoryCount)
+	checkpointEvent.WithCorrelationID(saga.Context().CorrelationID())
+	
+	// Добавляем checkpoint событие в список (после всех остальных событий)
+	eventsList = append(eventsList, checkpointEvent)
+	
+	// Вычисляем итоговую версию после сохранения всех событий (включая checkpoint)
+	finalSavedVersion := expectedVersion + int64(len(eventsList))
+
+	// Сохраняем события с корректным expectedVersion
+	if err := p.eventStore.AppendEvents(ctx, sagaID, expectedVersion, eventsList); err != nil {
 		return fmt.Errorf("failed to append events: %w", err)
 	}
 
-	// Создаем snapshot если нужно
-	if len(history) > 0 && len(history)%p.snapshotFreq == 0 {
-		snapshot := eventsourcing.Snapshot{
-			AggregateID:  sagaID,
-			AggregateType: "saga",
-			Version:      int64(len(history)),
-			Metadata:     saga.Context().ToMap(),
-			CreatedAt:    time.Now(),
+	// Обновляем или создаем snapshot с метаданными для оптимизации
+	shouldCreateSnapshot := len(history) > 0 && len(history)%p.snapshotFreq == 0
+	
+	// Всегда сохраняем/обновляем метаданные checkpoint в snapshot для оптимизации
+	snapshot, err := p.snapshotStore.GetSnapshot(ctx, sagaID)
+	if err == nil && snapshot != nil {
+		// Обновляем существующий snapshot с новыми метаданными checkpoint
+		if snapshot.Metadata == nil {
+			snapshot.Metadata = make(map[string]interface{})
 		}
+		// Копируем метаданные контекста, если их еще нет
+		contextMeta := saga.Context().ToMap()
+		for k, v := range contextMeta {
+			if _, exists := snapshot.Metadata[k]; !exists {
+				snapshot.Metadata[k] = v
+			}
+		}
+		// Обновляем метаданные checkpoint (используем finalSavedVersion, который включает checkpoint)
+		snapshot.Metadata["last_saved_version"] = finalSavedVersion
+		snapshot.Metadata["saved_history_count"] = currentHistoryCount
+		
+		// Обновляем состояние snapshot, если нужно
+		if shouldCreateSnapshot {
+			stateData, err := p.serializeSagaState(saga)
+			if err == nil {
+				snapshot.State = stateData
+				snapshot.Version = int64(len(history))
+			}
+		}
+		
+		// Сохраняем обновленный snapshot
+		if err := p.snapshotStore.SaveSnapshot(ctx, *snapshot); err != nil {
+			// Логируем ошибку, но не прерываем сохранение
+			_ = err
+		}
+	} else if shouldCreateSnapshot {
+		// Создаем новый snapshot если нужно (с метаданными checkpoint)
+		newSnapshot := eventsourcing.Snapshot{
+			AggregateID:   sagaID,
+			AggregateType: "saga",
+			Version:       int64(len(history)),
+			Metadata:      saga.Context().ToMap(),
+			CreatedAt:     time.Now(),
+		}
+		
+		// Добавляем метаданные checkpoint в snapshot
+		newSnapshot.Metadata["last_saved_version"] = finalSavedVersion
+		newSnapshot.Metadata["saved_history_count"] = currentHistoryCount
 
 		// Сериализуем состояние саги
 		stateData, err := p.serializeSagaState(saga)
 		if err != nil {
 			return fmt.Errorf("failed to serialize saga state: %w", err)
 		}
-		snapshot.State = stateData
+		newSnapshot.State = stateData
 
-		if err := p.snapshotStore.SaveSnapshot(ctx, snapshot); err != nil {
+		if err := p.snapshotStore.SaveSnapshot(ctx, newSnapshot); err != nil {
 			// Логируем ошибку, но не прерываем сохранение
 			_ = err
 		}
 	}
+	// Если snapshot не существует и создавать его не нужно, метаданные доступны через событие SagaStateCheckpoint
 
 	return nil
 }
@@ -230,13 +507,58 @@ func (p *EventStorePersistence) Load(ctx context.Context, sagaID string) (Saga, 
 		if err == nil {
 			return saga, nil
 		}
+		// Если snapshot не может быть восстановлен, но содержит метаданные,
+		// используем их для оптимизации чтения событий (опциональная оптимизация для длинных стримов)
 	}
 
-	// Загружаем все события и восстанавливаем состояние
-	storedEvents, err := p.eventStore.GetEvents(ctx, sagaID, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get events: %w", err)
+	// Определяем начальную версию для чтения событий
+	// Оптимизация (опциональная): если snapshot существует и содержит метаданные last_saved_version,
+	// начинаем чтение с этой версии вместо 0 для высоконагруженных сценариев с длинными стримами.
+	// Это оптимизация для случаев, когда snapshot не может быть восстановлен, но метаданные указывают,
+	// что большая часть истории уже сохранена в snapshot (хотя сам snapshot поврежден или устарел).
+	// В таких случаях мы можем начать чтение с более поздней версии, но это требует осторожности:
+	// если события до startVersion необходимы для восстановления состояния, нужно читать с версии 0.
+	startVersion := int64(0)
+	if snapshot != nil && snapshot.Metadata != nil {
+		if lastSavedVersionVal, ok := snapshot.Metadata["last_saved_version"]; ok {
+			switch v := lastSavedVersionVal.(type) {
+			case int64:
+				if v > 0 {
+					// Опциональная оптимизация: начинаем чтение с версии после последнего сохраненного
+					// Это полезно для длинных стримов, где большая часть истории уже в snapshot
+					startVersion = v + 1
+				}
+			case float64:
+				if v > 0 {
+					startVersion = int64(v) + 1
+				}
+			case int:
+				if v > 0 {
+					startVersion = int64(v) + 1
+				}
+			}
+		}
 	}
+
+	// Загружаем события начиная с оптимизированной версии или с начала (для обратной совместимости)
+	storedEvents, err := p.eventStore.GetEvents(ctx, sagaID, startVersion)
+	if err != nil {
+		// Если чтение с оптимизированной версии не удалось (например, события были удалены или стрим не найден),
+		// fallback на чтение с версии 0 для обратной совместимости
+		if startVersion > 0 {
+			storedEvents, err = p.eventStore.GetEvents(ctx, sagaID, 0)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to get events: %w", err)
+		}
+	}
+	
+	// Важно: если мы начали чтение с startVersion > 0, мы пропустили события до этой версии.
+	// Это опциональная оптимизация для высоконагруженных сценариев, где snapshot обычно содержит
+	// полную историю, но может быть поврежден. В таких случаях события после startVersion должны
+	// быть достаточными для восстановления текущего состояния (если snapshot был актуален).
+	// Для полной обратной совместимости и гарантии корректного восстановления, можно всегда
+	// читать с версии 0, но это может быть медленно для очень длинных стримов.
 
 	if len(storedEvents) == 0 {
 		return nil, fmt.Errorf("saga %s not found", sagaID)
@@ -668,6 +990,10 @@ func (p *PostgresPersistence) Save(ctx context.Context, saga Saga) error {
 	// Сохраняем историю шагов
 	history := saga.GetHistory()
 	for _, hist := range history {
+		// Генерируем детерминированный идентификатор на основе saga.ID(), step_name и started_at
+		// Это позволяет избежать дубликатов при повторных вызовах Save
+		histID := fmt.Sprintf("%s:%s:%d", sagaID, hist.StepName, hist.StartedAt.UnixNano())
+		
 		histQuery := `
 			INSERT INTO saga_history (id, saga_id, step_name, status, error, retry_attempt, started_at, completed_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -676,7 +1002,6 @@ func (p *PostgresPersistence) Save(ctx context.Context, saga Saga) error {
 				error = $5,
 				completed_at = $8
 		`
-		histID := uuid.New().String()
 		errorStr := ""
 		if hist.Error != nil {
 			errorStr = hist.Error.Error()

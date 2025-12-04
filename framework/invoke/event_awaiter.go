@@ -25,6 +25,7 @@ type EventAwaiter struct {
 type eventWaiter struct {
 	eventType     string
 	ch            chan events.Event
+	cancelCh      chan struct{} // Канал для активной отмены
 	timeout       time.Duration
 	correlationID string
 	createdAt     time.Time
@@ -78,6 +79,7 @@ func (a *EventAwaiter) Await(ctx context.Context, correlationID string, eventTyp
 	waiter := &eventWaiter{
 		eventType:     eventType,
 		ch:            make(chan events.Event, 1),
+		cancelCh:      make(chan struct{}),
 		timeout:       timeout,
 		correlationID: correlationID,
 		createdAt:     time.Now(),
@@ -126,6 +128,13 @@ func (a *EventAwaiter) Await(ctx context.Context, correlationID string, eventTyp
 		delete(a.waiters, correlationID)
 		a.mu.Unlock()
 		return nil, ctx.Err()
+	case <-waiter.cancelCh:
+		// Активная отмена - отписываемся перед возвратом
+		_ = a.eventSource.Unsubscribe(eventType, handler)
+		a.mu.Lock()
+		delete(a.waiters, correlationID)
+		a.mu.Unlock()
+		return nil, NewEventAwaiterStoppedError()
 	case <-a.stopCh:
 		// Отписываемся перед возвратом
 		_ = a.eventSource.Unsubscribe(eventType, handler)
@@ -174,6 +183,7 @@ func (a *EventAwaiter) AwaitAny(ctx context.Context, correlationID string, event
 	waiter := &eventWaiter{
 		eventType:     "", // Пустой тип означает "любой из указанных"
 		ch:            make(chan events.Event, 1),
+		cancelCh:      make(chan struct{}),
 		timeout:       timeout,
 		correlationID: correlationID,
 		createdAt:     time.Now(),
@@ -233,6 +243,15 @@ func (a *EventAwaiter) AwaitAny(ctx context.Context, correlationID string, event
 		delete(a.waiters, correlationID)
 		a.mu.Unlock()
 		return nil, "", ctx.Err()
+	case <-waiter.cancelCh:
+		// Активная отмена - отписываемся от всех типов
+		for _, handler := range handlers {
+			_ = a.eventSource.Unsubscribe(handler.EventType(), handler)
+		}
+		a.mu.Lock()
+		delete(a.waiters, correlationID)
+		a.mu.Unlock()
+		return nil, "", NewEventAwaiterStoppedError()
 	case <-a.stopCh:
 		// Отписываемся от всех типов
 		for _, handler := range handlers {
@@ -258,15 +277,27 @@ func (a *EventAwaiter) AwaitSuccessOrError(ctx context.Context, correlationID st
 	return event, isSuccess, nil
 }
 
-// Cancel отменяет ожидание события по correlation ID
+// Cancel активно отменяет ожидание события по correlation ID.
+// Метод прерывает блокирующее ожидание в Await/AwaitAny, отправляя сигнал отмены.
+// После вызова Cancel waiter будет удален из map, и ожидание немедленно завершится.
 func (a *EventAwaiter) Cancel(correlationID string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if waiter, exists := a.waiters[correlationID]; exists {
-		close(waiter.ch)
-		delete(a.waiters, correlationID)
+	waiter, exists := a.waiters[correlationID]
+	if !exists {
+		return
 	}
+
+	// Отправляем сигнал отмены в канал (не закрываем, чтобы избежать паники при повторном закрытии)
+	select {
+	case waiter.cancelCh <- struct{}{}:
+	default:
+		// Канал уже закрыт или полон, игнорируем
+	}
+
+	// Удаляем waiter из map
+	delete(a.waiters, correlationID)
 }
 
 // handleEvent обрабатывает событие и матчит его по correlation ID
@@ -305,16 +336,27 @@ func (a *EventAwaiter) handleEvent(ctx context.Context, event events.Event) {
 func (a *EventAwaiter) cleanup() {
 	defer a.wg.Done()
 
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
 			a.mu.Lock()
+			// Проверяем, остановлен ли awaiter
+			if a.stopped {
+				a.mu.Unlock()
+				return
+			}
 			now := time.Now()
 			for correlationID, waiter := range a.waiters {
-				if now.Sub(waiter.createdAt) > waiter.timeout+5*time.Minute {
+				// Уменьшаем запас времени до 30 секунд вместо 5 минут
+				if now.Sub(waiter.createdAt) > waiter.timeout+30*time.Second {
+					// Отправляем сигнал отмены перед закрытием каналов
+					select {
+					case waiter.cancelCh <- struct{}{}:
+					default:
+					}
 					close(waiter.ch)
 					delete(a.waiters, correlationID)
 				}
@@ -336,8 +378,14 @@ func (a *EventAwaiter) Stop(ctx context.Context) error {
 	a.stopped = true
 	close(a.stopCh)
 
-	// Закрываем все waiters
+	// Закрываем все waiters и удаляем их из waiters
+	// Это единственное место, где закрываются каналы waiters
 	for correlationID, waiter := range a.waiters {
+		// Отправляем сигнал отмены перед закрытием каналов
+		select {
+		case waiter.cancelCh <- struct{}{}:
+		default:
+		}
 		close(waiter.ch)
 		delete(a.waiters, correlationID)
 	}

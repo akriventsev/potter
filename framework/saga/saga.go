@@ -57,7 +57,7 @@ type SagaDefinition interface {
 	// Build строит FSM из определения
 	Build() (*fsm.FSM, error)
 	// CreateInstance создает экземпляр саги
-	CreateInstance(ctx context.Context, sagaCtx SagaContext) Saga
+	CreateInstance(ctx context.Context, sagaCtx SagaContext) (Saga, error)
 }
 
 // SagaContext контекст выполнения саги с данными и метаданными
@@ -76,8 +76,16 @@ type SagaContext interface {
 	GetFloat64(key string) float64
 	// GetStringSlice получает слайс строк
 	GetStringSlice(key string) []string
-	// Metadata возвращает метаданные
-	Metadata() SagaMetadata
+	// Metadata возвращает указатель на копию метаданных (snapshot).
+	// Метаданные являются read-only snapshot и не должны изменяться напрямую.
+	// Для изменения метаданных используйте методы SetTimeout, SetRetryPolicy, SetCustomValue.
+	Metadata() *SagaMetadata
+	// SetTimeout устанавливает timeout для саги
+	SetTimeout(timeout time.Duration)
+	// SetRetryPolicy устанавливает политику повторов для саги
+	SetRetryPolicy(policy *RetryPolicy)
+	// SetCustomValue устанавливает кастомное значение в метаданных
+	SetCustomValue(key string, value interface{})
 	// CorrelationID возвращает correlation ID
 	CorrelationID() string
 	// SetCorrelationID устанавливает correlation ID
@@ -731,10 +739,49 @@ func (c *SagaContextImpl) GetStringSlice(key string) []string {
 	return nil
 }
 
-func (c *SagaContextImpl) Metadata() SagaMetadata {
+func (c *SagaContextImpl) Metadata() *SagaMetadata {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.metadata
+	// Возвращаем указатель на копию метаданных (snapshot) для безопасности
+	// Изменения должны выполняться через специальные методы SetTimeout, SetRetryPolicy, SetCustomValue
+	metadataCopy := c.metadata
+	// Копируем вложенные структуры
+	if metadataCopy.RetryPolicy != nil {
+		retryPolicyCopy := *metadataCopy.RetryPolicy
+		metadataCopy.RetryPolicy = &retryPolicyCopy
+	}
+	if metadataCopy.Custom != nil {
+		customCopy := make(map[string]interface{})
+		for k, v := range metadataCopy.Custom {
+			customCopy[k] = v
+		}
+		metadataCopy.Custom = customCopy
+	}
+	return &metadataCopy
+}
+
+func (c *SagaContextImpl) SetTimeout(timeout time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metadata.Timeout = timeout
+	c.metadata.UpdatedAt = time.Now()
+}
+
+func (c *SagaContextImpl) SetRetryPolicy(policy *RetryPolicy) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metadata.RetryPolicy = policy
+	c.metadata.UpdatedAt = time.Now()
+}
+
+func (c *SagaContextImpl) SetCustomValue(key string, value interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.metadata.Custom == nil {
+		c.metadata.Custom = make(map[string]interface{})
+	}
+	c.metadata.Custom[key] = value
+	c.metadata.UpdatedAt = time.Now()
 }
 
 func (c *SagaContextImpl) CorrelationID() string {
@@ -841,17 +888,17 @@ func (d *BaseSagaDefinition) Build() (*fsm.FSM, error) {
 	return fsmInstance, nil
 }
 
-func (d *BaseSagaDefinition) CreateInstance(ctx context.Context, sagaCtx SagaContext) Saga {
+func (d *BaseSagaDefinition) CreateInstance(ctx context.Context, sagaCtx SagaContext) (Saga, error) {
 	return d.CreateInstanceWithPersistence(ctx, sagaCtx, nil)
 }
 
 // CreateInstanceWithPersistence создает экземпляр саги с persistence
-func (d *BaseSagaDefinition) CreateInstanceWithPersistence(ctx context.Context, sagaCtx SagaContext, persistence SagaPersistence) Saga {
+func (d *BaseSagaDefinition) CreateInstanceWithPersistence(ctx context.Context, sagaCtx SagaContext, persistence SagaPersistence) (Saga, error) {
 	return d.CreateInstanceWithPersistenceAndEventBus(ctx, sagaCtx, persistence, nil)
 }
 
 // CreateInstanceWithPersistenceAndEventBus создает экземпляр саги с persistence и eventBus
-func (d *BaseSagaDefinition) CreateInstanceWithPersistenceAndEventBus(ctx context.Context, sagaCtx SagaContext, persistence SagaPersistence, eventBus events.EventBus) Saga {
+func (d *BaseSagaDefinition) CreateInstanceWithPersistenceAndEventBus(ctx context.Context, sagaCtx SagaContext, persistence SagaPersistence, eventBus events.EventBus) (Saga, error) {
 	if sagaCtx == nil {
 		sagaCtx = NewSagaContext()
 	}
@@ -865,10 +912,7 @@ func (d *BaseSagaDefinition) CreateInstanceWithPersistenceAndEventBus(ctx contex
 	sagaID := uuid.New().String()
 	saga, err := NewBaseSagaWithEventBus(sagaID, d, sagaCtx, persistence, eventBus)
 	if err != nil {
-		// В случае ошибки возвращаем nil, вызывающий код должен обработать это
-		// В реальности лучше вернуть ошибку, но интерфейс Saga не поддерживает ошибку
-		// Можно добавить panic или логирование
-		return nil
+		return nil, fmt.Errorf("failed to create saga instance: %w", err)
 	}
-	return saga
+	return saga, nil
 }
