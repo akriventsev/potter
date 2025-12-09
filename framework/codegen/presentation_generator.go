@@ -22,14 +22,18 @@ func (g *PresentationGenerator) Generate(spec *ParsedSpec, config *GeneratorConf
 	// Генерация на основе указанных транспортов
 	hasREST := false
 	hasGraphQL := false
+	hasOpenAPI := false
 	hasGRPC := false
 
 	for _, transport := range spec.Transports {
 		switch transport {
 		case "REST":
 			hasREST = true
+			hasOpenAPI = true // OpenAPI автоматически включается при REST
 		case "GraphQL":
 			hasGraphQL = true
+		case "OpenAPI":
+			hasOpenAPI = true
 		case "gRPC":
 			hasGRPC = true
 		}
@@ -38,12 +42,20 @@ func (g *PresentationGenerator) Generate(spec *ParsedSpec, config *GeneratorConf
 	// Если транспорты не указаны, по умолчанию генерируем REST
 	if len(spec.Transports) == 0 {
 		hasREST = true
+		hasOpenAPI = true
 	}
 
 	// Генерация REST handler
 	if hasREST {
 		if err := g.generateRESTHandler(spec, config); err != nil {
 			return fmt.Errorf("failed to generate REST handler: %w", err)
+		}
+	}
+
+	// Генерация OpenAPI интеграции
+	if hasOpenAPI {
+		if err := g.generateOpenAPIIntegration(spec, config); err != nil {
+			return fmt.Errorf("failed to generate OpenAPI integration: %w", err)
 		}
 	}
 
@@ -158,6 +170,8 @@ func (g *PresentationGenerator) generateRESTHandler(spec *ParsedSpec, config *Ge
 
 	content.WriteString("\t}\n")
 	content.WriteString("\t// Дополнительные маршруты можно зарегистрировать в пользовательском файле handler.go\n")
+	content.WriteString("\t// OpenAPI спецификация доступна на /swagger/openapi.yaml\n")
+	content.WriteString("\t// Swagger UI доступен на /swagger/ (если зарегистрирован)\n")
 	content.WriteString("}\n")
 
 	path := "presentation/rest/handler.gen.go"
@@ -191,7 +205,7 @@ func (g *PresentationGenerator) generateRESTHandlerUserCode(spec *ParsedSpec, co
 			break
 		}
 	}
-	
+
 	userContent.WriteString("import (\n")
 	userContent.WriteString("\t\"net/http\"\n")
 	if needsStrconv {
@@ -231,7 +245,7 @@ func (g *PresentationGenerator) generateCommandHandler(cmd CommandSpec) string {
 	builder.WriteString(fmt.Sprintf("// %s обрабатывает команду %s\n",
 		strings.ToLower(cmd.Name), cmd.Name))
 	builder.WriteString(fmt.Sprintf("func (h *Handler) %s(c *gin.Context) {\n", cmd.Name))
-	
+
 	// Для Update и Delete команд извлекаем ID из URL параметра
 	if needsID {
 		builder.WriteString("\t// Извлечение ID из URL параметра\n")
@@ -309,7 +323,7 @@ func (g *PresentationGenerator) generateQueryHandler(query QuerySpec) string {
 	builder.WriteString(fmt.Sprintf("// %s обрабатывает запрос %s\n",
 		strings.ToLower(query.Name), query.Name))
 	builder.WriteString(fmt.Sprintf("func (h *Handler) %s(c *gin.Context) {\n", query.Name))
-	
+
 	// Для Get запросов извлекаем ID из URL параметра
 	if isGet {
 		builder.WriteString("\t// Извлечение ID из URL параметра\n")
@@ -424,6 +438,41 @@ func (g *PresentationGenerator) generateAPIExamples(spec *ParsedSpec, _ *Generat
 		mdContent.WriteString("```bash\n")
 		mdContent.WriteString(fmt.Sprintf("curl http://localhost:8080/api/v1/%s\n", resourceName))
 		mdContent.WriteString("```\n\n")
+	}
+
+	// Добавление OpenAPI примеров, если OpenAPI включен
+	hasOpenAPI := false
+	for _, transport := range spec.Transports {
+		if transport == "REST" || transport == "OpenAPI" {
+			hasOpenAPI = true
+			break
+		}
+	}
+
+	if hasOpenAPI {
+		mdContent.WriteString("## OpenAPI\n\n")
+		mdContent.WriteString("OpenAPI спецификация доступна на `http://localhost:8080/swagger/openapi.yaml`\n\n")
+		mdContent.WriteString("### Swagger UI\n\n")
+		mdContent.WriteString("Для интерактивного тестирования используйте Swagger UI:\n\n")
+		mdContent.WriteString("```bash\n")
+		mdContent.WriteString("open http://localhost:8080/swagger/\n")
+		mdContent.WriteString("```\n\n")
+		mdContent.WriteString("### OpenAPI Validation\n\n")
+		mdContent.WriteString("Примеры curl команд с OpenAPI validation:\n\n")
+		for _, cmd := range spec.Commands {
+			resourceName := g.converter.ToSnakeCase(cmd.Aggregate)
+			if !strings.HasSuffix(resourceName, "s") {
+				resourceName = resourceName + "s"
+			}
+			mdContent.WriteString(fmt.Sprintf("#### %s\n\n", cmd.Name))
+			mdContent.WriteString("```bash\n")
+			mdContent.WriteString(fmt.Sprintf("curl -X POST http://localhost:8080/api/v1/%s \\\n", resourceName))
+			mdContent.WriteString("\t-H \"Content-Type: application/json\" \\\n")
+			mdContent.WriteString("\t-d '{\n")
+			mdContent.WriteString("\t\t\"field\": \"value\"\n")
+			mdContent.WriteString("\t}'\n")
+			mdContent.WriteString("```\n\n")
+		}
 	}
 
 	// Добавление GraphQL примеров, если GraphQL включен
@@ -545,7 +594,7 @@ func (g *PresentationGenerator) toCamelCase(s string) string {
 // getRESTRouteForCommand определяет HTTP метод и маршрут для команды в соответствии с REST
 func (g *PresentationGenerator) getRESTRouteForCommand(cmd CommandSpec, resourceName string) (string, string) {
 	cmdName := strings.ToLower(cmd.Name)
-	
+
 	// Определяем тип команды по имени
 	if strings.HasPrefix(cmdName, "create") {
 		// POST /api/v1/{resource} - создание ресурса
@@ -557,7 +606,7 @@ func (g *PresentationGenerator) getRESTRouteForCommand(cmd CommandSpec, resource
 		// DELETE /api/v1/{resource}/:id - удаление ресурса
 		return "DELETE", fmt.Sprintf("/%s/:id", resourceName)
 	}
-	
+
 	// По умолчанию POST для других команд
 	return "POST", fmt.Sprintf("/%s/%s", resourceName, g.converter.ToSnakeCase(cmd.Name))
 }
@@ -565,7 +614,7 @@ func (g *PresentationGenerator) getRESTRouteForCommand(cmd CommandSpec, resource
 // getRESTRouteForQuery определяет маршрут для запроса в соответствии с REST
 func (g *PresentationGenerator) getRESTRouteForQuery(query QuerySpec, resourceName string) string {
 	queryName := strings.ToLower(query.Name)
-	
+
 	// Определяем тип запроса по имени
 	if strings.HasPrefix(queryName, "get") {
 		// GET /api/v1/{resource}/:id - получение одного ресурса
@@ -574,7 +623,7 @@ func (g *PresentationGenerator) getRESTRouteForQuery(query QuerySpec, resourceNa
 		// GET /api/v1/{resource} - получение списка ресурсов
 		return fmt.Sprintf("/%s", resourceName)
 	}
-	
+
 	// По умолчанию GET /api/v1/{resource}/{query_name}
 	return fmt.Sprintf("/%s/%s", resourceName, g.converter.ToSnakeCase(query.Name))
 }
@@ -582,7 +631,7 @@ func (g *PresentationGenerator) getRESTRouteForQuery(query QuerySpec, resourceNa
 // inferResourceFromQuery определяет имя ресурса из имени запроса
 func (g *PresentationGenerator) inferResourceFromQuery(queryName string) string {
 	queryNameLower := strings.ToLower(queryName)
-	
+
 	// Убираем префиксы Get, List, Find, Search и т.д.
 	prefixes := []string{"get", "list", "find", "search", "fetch", "retrieve", "query"}
 	for _, prefix := range prefixes {
@@ -604,7 +653,7 @@ func (g *PresentationGenerator) inferResourceFromQuery(queryName string) string 
 			return resourceSnake
 		}
 	}
-	
+
 	// По умолчанию используем имя запроса в snake_case
 	resourceSnake := g.converter.ToSnakeCase(queryName)
 	// Убираем 's' в конце если есть
@@ -720,6 +769,74 @@ func (g *PresentationGenerator) generateGraphQLAdapterUserCode(config *Generator
 	return g.writer.WriteFile(userPath, userContent.String())
 }
 
+// generateOpenAPIIntegration генерирует OpenAPI адаптер и спецификацию
+func (g *PresentationGenerator) generateOpenAPIIntegration(spec *ParsedSpec, config *GeneratorConfig) error {
+	// Генерация OpenAPI спецификации через OpenAPIGenerator
+	openAPIGen := NewOpenAPIGenerator(g.outputDir)
+	if err := openAPIGen.Generate(spec, config); err != nil {
+		return fmt.Errorf("failed to generate OpenAPI spec: %w", err)
+	}
+
+	// Генерация Swagger UI адаптера
+	if err := g.generateSwaggerUIAdapter(spec, config); err != nil {
+		return fmt.Errorf("failed to generate Swagger UI adapter: %w", err)
+	}
+
+	return nil
+}
+
+// generateSwaggerUIAdapter генерирует Swagger UI адаптер для интеграции с REST транспортом
+func (g *PresentationGenerator) generateSwaggerUIAdapter(spec *ParsedSpec, config *GeneratorConfig) error {
+	if config == nil {
+		config = &GeneratorConfig{}
+	}
+	var content strings.Builder
+
+	content.WriteString("// Code generated by potter-gen. DO NOT EDIT.\n\n")
+	content.WriteString("package rest\n\n")
+	content.WriteString("import (\n")
+	content.WriteString("\t\"github.com/gin-gonic/gin\"\n")
+	potterPath := ""
+	if config != nil {
+		potterPath = config.PotterImportPath
+	}
+	if potterPath == "" {
+		potterPath = "github.com/akriventsev/potter"
+	}
+	baseImportPath := strings.Split(potterPath, "@")[0]
+	content.WriteString(fmt.Sprintf("\tswaggertransport \"%s/framework/adapters/transport\"\n", baseImportPath))
+	content.WriteString(")\n\n")
+
+	content.WriteString("// RegisterSwaggerUI регистрирует Swagger UI маршруты\n")
+	content.WriteString("// Вызовите этот метод в main.go после создания router:\n")
+	content.WriteString("//   swaggerConfig := swaggertransport.SwaggerUIConfig{\n")
+	content.WriteString("//       Enabled: true,\n")
+	content.WriteString("//       Path: \"/swagger\",\n")
+	content.WriteString("//       SpecPath: \"./api/openapi/openapi.yaml\",\n")
+	content.WriteString("//   }\n")
+	content.WriteString("//   swaggerAdapter, _ := swaggertransport.NewSwaggerUIAdapter(swaggerConfig)\n")
+	content.WriteString("//   swaggerAdapter.RegisterRoutes(router)\n")
+	content.WriteString("func RegisterSwaggerUI(router *gin.Engine) error {\n")
+	content.WriteString("\tswaggerConfig := swaggertransport.SwaggerUIConfig{\n")
+	content.WriteString("\t\tEnabled:             true,\n")
+	content.WriteString("\t\tPath:                \"/swagger\",\n")
+	content.WriteString("\t\tSpecPath:            \"./api/openapi/openapi.yaml\",\n")
+	content.WriteString("\t\tDeepLinking:         true,\n")
+	content.WriteString("\t\tDisplayRequestDuration: true,\n")
+	content.WriteString("\t\tValidateSpec:        false,\n")
+	content.WriteString("\t}\n\n")
+	content.WriteString("\tswaggerAdapter, err := swaggertransport.NewSwaggerUIAdapter(swaggerConfig)\n")
+	content.WriteString("\tif err != nil {\n")
+	content.WriteString("\t\treturn err\n")
+	content.WriteString("\t}\n\n")
+	content.WriteString("\tswaggerAdapter.RegisterRoutes(router)\n")
+	content.WriteString("\treturn nil\n")
+	content.WriteString("}\n")
+
+	path := "presentation/rest/swagger.gen.go"
+	return g.writer.WriteFile(path, content.String())
+}
+
 // protoToGoType конвертирует proto тип в Go тип
 func (g *PresentationGenerator) protoToGoType(protoType string, repeated bool) string {
 	var goType string
@@ -742,7 +859,7 @@ func (g *PresentationGenerator) protoToGoType(protoType string, repeated bool) s
 		// Для пользовательских типов (например, Item) возвращаем как есть
 		goType = protoType
 	}
-	
+
 	// Если поле repeated, добавляем слайс
 	if repeated {
 		return "[]" + goType

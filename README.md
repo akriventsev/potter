@@ -56,12 +56,14 @@
 | Event Sourcing | ✅ Production Ready | Postgres/MongoDB адаптеры, snapshots, replay, projections |
 | Saga Pattern | ✅ Production Ready | FSM, компенсация, persistence, query handler с read models |
 | CQRS Invoke | ✅ Production Ready | Type-safe invokers для команд и запросов |
-| GraphQL Transport | ✅ Production Ready | Автогенерация схем, queries/mutations/subscriptions |
+| GraphQL Transport | ✅ Production Ready | Queries/mutations/subscriptions, автогенерация схем, comprehensive тесты |
 | Query Builder | ✅ Production Ready | Fluent API для Postgres и MongoDB |
 | Schema Migrations | ✅ Production Ready | Goose integration, SQL и Go миграции |
 | Projections Framework | ✅ Production Ready | Checkpoint management, rebuild support |
 | Code Generator | ✅ Production Ready | Proto-first codegen с incremental updates |
-| EventStoreDB Adapter | ⏳ Pending | Структура готова, ожидает stable Go client v21.2+ |
+| EventStoreDB Adapter | ⏳ Experimental | Структура готова, ожидает stable Go client v21.2+ |
+
+**Общий статус:** 95% компонентов Production Ready
 
 Подробнее о планах развития см. [ROADMAP.md](ROADMAP.md).
 

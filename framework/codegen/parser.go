@@ -56,6 +56,10 @@ type CommandSpec struct {
 	Async          bool
 	Idempotent     bool
 	TimeoutSeconds int32
+	Tags           []string
+	Summary        string
+	Description    string
+	Deprecated     bool
 }
 
 // QuerySpec спецификация запроса
@@ -68,6 +72,10 @@ type QuerySpec struct {
 	Cacheable       bool
 	CacheTTLSeconds int32
 	ReadModel       string
+	Tags            []string
+	Summary         string
+	Description     string
+	Deprecated      bool
 }
 
 // EventSpec спецификация события
@@ -110,6 +118,10 @@ type CommandOptions struct {
 	Async          bool
 	Idempotent     bool
 	TimeoutSeconds int32
+	Tags           []string
+	Summary        string
+	Description    string
+	Deprecated     bool
 }
 
 // QueryOptions опции запроса
@@ -117,6 +129,10 @@ type QueryOptions struct {
 	Cacheable       bool
 	CacheTTLSeconds int32
 	ReadModel       string
+	Tags            []string
+	Summary         string
+	Description     string
+	Deprecated      bool
 }
 
 // EventOptions опции события
@@ -241,6 +257,10 @@ func (p *ProtoParser) ParseProtoFile(file *descriptorpb.FileDescriptorProto) (*P
 					Async:          cmdOpts.Async,
 					Idempotent:     cmdOpts.Idempotent,
 					TimeoutSeconds: cmdOpts.TimeoutSeconds,
+					Tags:           cmdOpts.Tags,
+					Summary:        cmdOpts.Summary,
+					Description:    cmdOpts.Description,
+					Deprecated:     cmdOpts.Deprecated,
 				})
 			}
 
@@ -265,6 +285,10 @@ func (p *ProtoParser) ParseProtoFile(file *descriptorpb.FileDescriptorProto) (*P
 					Cacheable:       queryOpts.Cacheable,
 					CacheTTLSeconds: queryOpts.CacheTTLSeconds,
 					ReadModel:       queryOpts.ReadModel,
+					Tags:            queryOpts.Tags,
+					Summary:         queryOpts.Summary,
+					Description:     queryOpts.Description,
+					Deprecated:      queryOpts.Deprecated,
 				})
 			}
 
@@ -431,6 +455,38 @@ func (p *ProtoParser) parseCommandOptions(data []byte) *CommandOptions {
 					data = data[m:]
 				}
 			}
+		case 5: // tags (repeated string)
+			if wireType == protowire.BytesType {
+				val, m := protowire.ConsumeBytes(data)
+				if m >= 0 {
+					opts.Tags = append(opts.Tags, string(val))
+					data = data[m:]
+				}
+			}
+		case 6: // summary (string)
+			if wireType == protowire.BytesType {
+				val, m := protowire.ConsumeBytes(data)
+				if m >= 0 {
+					opts.Summary = string(val)
+					data = data[m:]
+				}
+			}
+		case 7: // description (string)
+			if wireType == protowire.BytesType {
+				val, m := protowire.ConsumeBytes(data)
+				if m >= 0 {
+					opts.Description = string(val)
+					data = data[m:]
+				}
+			}
+		case 8: // deprecated (bool)
+			if wireType == protowire.VarintType {
+				val, m := protowire.ConsumeVarint(data)
+				if m >= 0 {
+					opts.Deprecated = val != 0
+					data = data[m:]
+				}
+			}
 		default:
 			// Пропускаем неизвестное поле
 			m := protowire.ConsumeFieldValue(tag, wireType, data)
@@ -494,6 +550,38 @@ func (p *ProtoParser) parseQueryOptions(data []byte) *QueryOptions {
 				val, m := protowire.ConsumeBytes(data)
 				if m >= 0 {
 					opts.ReadModel = string(val)
+					data = data[m:]
+				}
+			}
+		case 4: // tags (repeated string)
+			if wireType == protowire.BytesType {
+				val, m := protowire.ConsumeBytes(data)
+				if m >= 0 {
+					opts.Tags = append(opts.Tags, string(val))
+					data = data[m:]
+				}
+			}
+		case 5: // summary (string)
+			if wireType == protowire.BytesType {
+				val, m := protowire.ConsumeBytes(data)
+				if m >= 0 {
+					opts.Summary = string(val)
+					data = data[m:]
+				}
+			}
+		case 6: // description (string)
+			if wireType == protowire.BytesType {
+				val, m := protowire.ConsumeBytes(data)
+				if m >= 0 {
+					opts.Description = string(val)
+					data = data[m:]
+				}
+			}
+		case 7: // deprecated (bool)
+			if wireType == protowire.VarintType {
+				val, m := protowire.ConsumeVarint(data)
+				if m >= 0 {
+					opts.Deprecated = val != 0
 					data = data[m:]
 				}
 			}

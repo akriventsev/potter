@@ -64,6 +64,10 @@ message CommandOptions {
   bool async = 2;                 // Асинхронное выполнение команды
   bool idempotent = 3;             // Идемпотентность команды
   int32 timeout_seconds = 4;      // Таймаут выполнения команды в секундах
+  repeated string tags = 5;        // OpenAPI tags для группировки операций
+  string summary = 6;              // Краткое описание операции
+  string description = 7;          // Полное описание операции
+  bool deprecated = 8;             // Пометка операции как deprecated
 }
 
 // QueryOptions настройки запроса
@@ -71,6 +75,10 @@ message QueryOptions {
   bool cacheable = 1;             // Можно ли кешировать результат
   int32 cache_ttl_seconds = 2;    // TTL кеша в секундах
   string read_model = 3;          // Имя read model для запроса
+  repeated string tags = 4;       // OpenAPI tags для группировки операций
+  string summary = 5;             // Краткое описание операции
+  string description = 6;        // Полное описание операции
+  bool deprecated = 7;            // Пометка операции как deprecated
 }
 
 // EventOptions настройки события
@@ -104,5 +112,31 @@ message ServiceOptions {
   // Пример: transport: ["REST", "GraphQL"] - генерирует REST и GraphQL адаптеры
   // GraphQL автоматически создает Query, Mutation и Subscription резолверы
   repeated string transport = 2;
+  bool enable_openapi = 3;        // Явное включение OpenAPI генерации (опционально, можно определять по наличию "REST" в transport)
+  string openapi_version = 4;    // Версия OpenAPI спецификации (по умолчанию "3.0.3")
+  OpenAPIInfo openapi_info = 5;  // Метаданные для OpenAPI спецификации
+}
+
+// OpenAPIInfo метаданные для OpenAPI спецификации
+message OpenAPIInfo {
+  string title = 1;              // Название API (по умолчанию из module_name)
+  string version = 2;            // Версия API (по умолчанию "1.0.0")
+  string description = 3;        // Описание API
+  string terms_of_service = 4;   // URL Terms of Service
+  OpenAPIContact contact = 5;    // Контактная информация
+  OpenAPILicense license = 6;     // Лицензия
+}
+
+// OpenAPIContact контактная информация
+message OpenAPIContact {
+  string name = 1;
+  string url = 2;
+  string email = 3;
+}
+
+// OpenAPILicense лицензия
+message OpenAPILicense {
+  string name = 1;
+  string url = 2;
 }
 

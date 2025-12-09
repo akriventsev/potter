@@ -26,6 +26,172 @@
 - Рефакторинг PresentationGenerator для поддержки множественных транспортов
 - Обновлена генерация main.go для автоматической инициализации указанных транспортов
 
+### Added (v1.6.0 - Development)
+
+> **Примечание:** Текущая ветка представляет собой development snapshot версии 1.6.0, не предназначенный для production использования. Функциональность частично реализована и требует доработки и тестирования.
+
+## [1.6.0] - TBD (Planned)
+
+### Added
+
+#### OpenAPI Integration
+
+- **OpenAPIGenerator**: Автоматическая генерация OpenAPI 3.0 спецификаций из proto файлов
+  - `framework/codegen/openapi_generator.go` - генератор с TypeMapper и SchemaBuilder
+  - Маппинг proto типов → OpenAPI типов (string, integer, number, boolean, array, object)
+  - Генерация paths из Commands/Queries с REST conventions
+  - Генерация components/schemas из агрегатов
+  - Поддержка Potter annotations → OpenAPI extensions (x-async, x-cacheable)
+  - Выходные файлы: `api/openapi/openapi.yaml`
+
+- **SwaggerUIAdapter**: Интеграция Swagger UI в REST транспорт
+  - `framework/adapters/transport/swagger.go` - адаптер с lifecycle management
+  - SwaggerUIConfig для настройки (Path, SpecPath, DeepLinking, ValidateSpec)
+  - Endpoints: GET /swagger/openapi.yaml, GET /swagger/ (UI)
+  - Использует Swagger UI CDN для assets
+  - Опциональная валидация OpenAPI спецификации при загрузке
+  - Интеграция с metrics для мониторинга
+
+- **OpenAPIValidator**: Middleware для валидации HTTP запросов по OpenAPI схеме
+  - `framework/adapters/transport/openapi_validation.go` - validator с kin-openapi
+  - Валидация request body, query params, headers, path params по schema
+  - ValidationOptions для настройки (ValidateRequest, ValidateResponse, MultiError)
+  - Детальные сообщения об ошибках валидации с указанием поля и ожидаемой schema
+  - Gin middleware для автоматической валидации
+  - Кеширование загруженной спецификации для производительности
+
+- **Proto Options Extensions**: Расширение `api/proto/potter/options.proto`
+  - OpenAPIInfo message с title, version, description, contact, license
+  - OpenAPIContact и OpenAPILicense для метаданных
+  - Поля tags, summary, description, deprecated в CommandOptions и QueryOptions
+  - enable_openapi, openapi_version, openapi_info в ServiceOptions
+  - Все поля опциональны для обратной совместимости
+
+- **Codegen Integration**: Интеграция OpenAPI в presentation generator
+  - Обновление `PresentationGenerator.Generate()` для поддержки OpenAPI транспорта
+  - `generateOpenAPIIntegration()` метод для генерации openapi.yaml
+  - `generateSwaggerUIAdapter()` для генерации Swagger UI registration кода
+  - Обновление `generateAPIExamples()` с секцией OpenAPI
+  - Автоматическая генерация при наличии REST транспорта
+
+- **Examples**: Comprehensive пример `examples/openapi-service/`
+  - Демонстрация генерации OpenAPI спецификации из proto
+  - Интеграция Swagger UI
+  - Валидация запросов по OpenAPI схеме
+  - REST API с CRUD операциями
+  - Docker Compose для локального запуска
+  - Подробный README с примерами использования
+
+#### Observability Module
+
+- **Distributed Tracing**: OpenTelemetry интеграция для distributed tracing
+  - `framework/observability/tracing.go` - TracingManager с lifecycle management
+  - TracingConfig для настройки (ServiceName, Exporter, SamplingRate, Environment)
+  - Поддержка exporters: Jaeger, Zipkin, OTLP, Stdout
+  - HTTPTracingMiddleware для автоматической инструментации HTTP requests
+  - GRPCTracingInterceptor для gRPC calls
+  - TraceCommand, TraceQuery, TraceEvent для интеграции с CQRS
+  - Автоматическая propagation trace context через W3C Trace Context
+  - Resource attributes (service.name, service.version, deployment.environment)
+
+- **Correlation ID Propagation**: Сквозная propagation через все слои
+  - ExtractCorrelationID, InjectCorrelationID, PropagateCorrelationID утилиты
+  - CorrelationIDMiddleware для автоматической генерации/propagation
+  - Propagation через HTTP headers (X-Correlation-ID)
+  - Propagation через gRPC metadata
+  - Интеграция с trace context
+
+- **Debugging Utilities**: Инструменты для production debugging
+  - `framework/observability/debugging.go` - DebugManager с pprof endpoints
+  - DebugConfig для настройки (EnablePprof, PprofPort, EnableHealthCheck)
+  - Pprof endpoints: /debug/pprof/* (heap, goroutine, profile, trace)
+  - RequestDumpMiddleware для логирования HTTP requests/responses
+  - ProfileCommand для профилирования команд
+  - DetectBottlenecks для автоматического обнаружения bottlenecks
+  - Sanitization sensitive data в логах
+
+- **Health Checks**: Built-in health checks для Kubernetes integration
+  - HealthCheck interface и HealthCheckResult struct
+  - DatabaseHealthCheck - проверка подключения к БД
+  - MessageBusHealthCheck - проверка message bus
+  - DiskSpaceHealthCheck - проверка свободного места
+  - MemoryHealthCheck - проверка использования памяти
+  - Endpoints: GET /health (liveness), GET /ready (readiness)
+  - JSON response с детальным статусом всех проверок
+  - Интеграция с Kubernetes probes
+
+- **Documentation**: Comprehensive документация
+  - `framework/observability/README.md` - полное руководство по observability
+  - Quick start guide с примерами кода
+  - Интеграция с Jaeger, Zipkin, Prometheus
+  - Best practices для production deployment
+  - Troubleshooting guide
+
+- **Examples**: Comprehensive пример `examples/observability-demo/`
+  - Демонстрация distributed tracing с Jaeger
+  - Correlation ID propagation
+  - Health checks и readiness probes
+  - Pprof profiling
+  - Metrics с Prometheus и Grafana dashboards
+  - Docker Compose с полным observability stack
+  - Load testing и performance analysis
+  - Подробный README с примерами использования
+
+#### Production Best Practices
+
+- **Production Deployment Guide**: Comprehensive руководство
+  - `docs/PRODUCTION_BEST_PRACTICES.md` - полное руководство по production deployment
+  - Configuration management (environment variables, secrets)
+  - Database migrations best practices (zero-downtime, expand-contract pattern)
+  - Security guidelines (authentication, authorization, TLS, input validation)
+  - Performance optimization (connection pooling, caching, resource limits)
+  - High availability setup (horizontal scaling, load balancing, database HA)
+  - Disaster recovery (backups, recovery testing, multi-region)
+  - Monitoring and alerting (key metrics, Prometheus alerts, on-call rotation)
+  - CI/CD pipeline examples (GitHub Actions, deployment strategies)
+  - Troubleshooting guide (common issues, debugging techniques)
+  - Production deployment checklist
+
+### Changed
+
+- **VERSION**: Обновлена версия с 1.5.0 на 1.6.0-dev для обозначения development версии
+- **ROADMAP.md**: Детализированы планы v1.6.0 с разбивкой задач по компонентам
+  - Добавлена секция "Планируемые компоненты v1.6.0" в метрики качества
+  - Обновлена таблица "Статус по версиям" с прогрессом v1.6.0 (40% завершено)
+  - Детализированы приоритеты с указанием файлов и зависимостей
+  - Отмечены реализованные компоненты (OpenAPI Generator, Swagger UI, Validation, Observability)
+
+### Fixed
+
+- Исправлено использование baggage API в tracing.go (заменено на go.opentelemetry.io/otel/baggage)
+- Исправлено использование pprof API в debugging.go (заменено runtime/pprof на net/http/pprof)
+- Реализовано использование всех полей ValidationOptions в openapi_validation.go
+- Исправлена генерация correlation ID (используется UUID вместо неправильного кода)
+
+### Known Issues
+
+- Генерация schemas для request/response messages в OpenAPIGenerator требует доработки
+- Парсинг OpenAPIInfo из ServiceOptions требует реализации
+- Unit и integration тесты для новых компонентов требуются
+
+### Dependencies
+
+- Added `github.com/getkin/kin-openapi/openapi3` - OpenAPI 3.0 parser and validator
+- Added `go.opentelemetry.io/otel` - OpenTelemetry SDK
+- Added `go.opentelemetry.io/otel/exporters/jaeger` - Jaeger exporter
+- Added `go.opentelemetry.io/otel/exporters/zipkin` - Zipkin exporter
+- Added `go.opentelemetry.io/otel/exporters/otlp/otlptrace` - OTLP exporter
+- Added `go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp` - HTTP instrumentation
+- Added `go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc` - gRPC instrumentation
+
+### Notes
+
+- EventStoreDB Adapter остается в experimental статусе, ожидая stable Go client v21.2+
+- Все новые компоненты полностью обратно совместимы с v1.5.0
+- OpenAPI генерация автоматически активируется при наличии REST транспорта
+- Observability компоненты опциональны и настраиваются через config
+- Production best practices основаны на реальном production опыте
+
 ## [1.5.0] - 2025-XX-XX
 
 ### Added
